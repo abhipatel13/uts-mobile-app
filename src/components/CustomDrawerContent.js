@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthService } from '../services/AuthService';
 
 const menuItems = [
   {
@@ -80,6 +82,20 @@ export default function CustomDrawerContent(props) {
   const { navigation, state } = props;
   const currentRoute = state.routeNames[state.index];
   const [expandedMenus, setExpandedMenus] = useState(new Set());
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await AuthService.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const toggleMenu = (index) => {
     const newExpanded = new Set(expandedMenus);
@@ -114,6 +130,36 @@ export default function CustomDrawerContent(props) {
       // Navigate to the route
       navigation.navigate(subItem.route);
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AuthService.logout();
+              // Navigation will be handled by the auth state change in App.js
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -217,10 +263,17 @@ export default function CustomDrawerContent(props) {
       {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.userInfo}>
-          <Text style={styles.userRole}>Admin</Text>
-          <View style={styles.userToggle}>
-            <Ionicons name="chevron-up" size={16} color="#94a3b8" />
+          <View>
+            <Text style={styles.userName}>
+              {currentUser?.name || currentUser?.email || 'User'}
+            </Text>
+            <Text style={styles.userRole}>
+              {currentUser?.role || 'User'}
+            </Text>
           </View>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -342,12 +395,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  userName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   userRole: {
     color: '#94a3b8',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
+    textTransform: 'capitalize',
   },
-  userToggle: {
-    padding: 4,
+  logoutButton: {
+    padding: 8,
+    borderRadius: 6,
   },
 });

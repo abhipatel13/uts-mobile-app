@@ -1,177 +1,313 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   FlatList,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { TaskHazardApi } from '../services';
+import AddTaskHazardModal from '../components/AddTaskHazardModal';
 
 const TaskHazardScreen = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 3;
+  const [taskHazards, setTaskHazards] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isCreatingTaskHazard, setIsCreatingTaskHazard] = useState(false);
 
-  // Sample data matching your screenshot
-  const taskHazards = [
-    {
-      id: 363,
-      scopeOfWork: 'Testing',
-      dateTime: '2025-08-29 13:59:15',
-      location: '33.41217628821304, -111.88909990128468',
-      risk: 9,
-      status: 'Active',
-      riskColor: '#fbbf24', // yellow
-    },
-    {
-      id: 362,
-      scopeOfWork: 'Test',
-      dateTime: '2025-08-29 13:57:14',
-      location: '33.41216606938553, -111.88907074898039',
-      risk: 2,
-      status: 'Active',
-      riskColor: '#22c55e', // green
-    },
-    {
-      id: 157,
-      scopeOfWork: 'Testing',
-      dateTime: '2025-07-17 20:20:00',
-      location: '43.81667658952818, -79.30446724702082',
-      risk: 4,
-      status: 'Active',
-      riskColor: '#f59e0b', // orange
-    },
-  ];
+  // Load task hazards on component mount
+  useEffect(() => {
+    fetchTaskHazards();
+  }, []);
 
-  const tableHeaders = [
-    { key: 'id', title: 'ID', flex: 0.5 },
-    { key: 'scopeOfWork', title: 'Scope of Work', flex: 1.2 },
-    { key: 'dateTime', title: 'Date & Time', flex: 1.2 },
-    { key: 'location', title: 'Location', flex: 1.8 },
-    { key: 'risk', title: 'Risk', flex: 0.6 },
-    { key: 'status', title: 'Status', flex: 0.8 },
-    { key: 'actions', title: 'Actions', flex: 0.6 },
-  ];
+  const fetchTaskHazards = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      const response = await TaskHazardApi.getAll();
+      const apiTaskHazards = response.data || [];
+
+      if (!Array.isArray(apiTaskHazards)) {
+        throw new Error('Invalid response format from server');
+      }
+
+      setTaskHazards(apiTaskHazards);
+
+    } catch (error) {
+      console.error('Error fetching task hazards:', error);
+      setError(error.message || 'Failed to load task hazards. Please try again.');
+      
+      // Show alert for errors
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to load task hazards. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchTaskHazards(true);
+  };
+
+  const handleCreateTaskHazard = async (taskHazardData) => {
+    try {
+      setIsCreatingTaskHazard(true);
+      
+      await TaskHazardApi.create(taskHazardData);
+      
+      // Refresh the task hazards list
+      await fetchTaskHazards();
+      
+      Alert.alert('Success', 'Task Hazard created successfully!');
+      
+    } catch (error) {
+      console.error('Error creating task hazard:', error);
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsCreatingTaskHazard(false);
+    }
+  };
+
+  const handleDeleteTaskHazard = async (taskHazardId) => {
+    Alert.alert(
+      'Delete Task Hazard',
+      'Are you sure you want to delete this task hazard?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await TaskHazardApi.delete(taskHazardId);
+              await fetchTaskHazards();
+              Alert.alert('Success', 'Task Hazard deleted successfully!');
+            } catch (error) {
+              console.error('Error deleting task hazard:', error);
+              Alert.alert('Error', error.message || 'Failed to delete task hazard');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const calculateHighestRiskScore = (risks) => {
+    if (!risks || risks.length === 0) return 1;
+    return Math.max(...risks.map(risk => risk.asIsLikelihood * risk.asIsConsequence));
+  };
 
   const getRiskColor = (risk) => {
-    if (risk <= 3) return '#22c55e'; // green
-    if (risk <= 6) return '#f59e0b'; // orange
-    return '#ef4444'; // red
+    if (risk <= 4) return '#22c55e'; // green - low
+    if (risk <= 9) return '#f59e0b'; // orange - medium
+    if (risk <= 16) return '#ef4444'; // red - high
+    return '#991b1b'; // dark red - critical
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Active': return '#22c55e';
+      case 'Pending': return '#f59e0b';
+      case 'Rejected': return '#ef4444';
+      case 'Completed': return '#3b82f6';
+      case 'Inactive': return '#6b7280';
+      default: return '#6b7280';
+    }
   };
 
   const renderTaskHazardItem = ({ item }) => {
+    const highestRisk = calculateHighestRiskScore(item.risks);
+    const dateTime = `${item.date} ${item.time}`;
+
     return (
-      <View style={styles.taskHazardRow}>
-        <Text style={[styles.cellText, { flex: 0.5 }]}>{item.id}</Text>
-        <Text style={[styles.cellText, { flex: 1.2 }]} numberOfLines={1}>
-          {item.scopeOfWork}
-        </Text>
-        <Text style={[styles.cellText, { flex: 1.2, fontSize: 12 }]} numberOfLines={2}>
-          {item.dateTime}
-        </Text>
-        <Text style={[styles.cellText, { flex: 1.8, fontSize: 11 }]} numberOfLines={2}>
-          {item.location}
-        </Text>
-        <View style={[styles.riskContainer, { flex: 0.6 }]}>
-          <View style={[styles.riskBadge, { backgroundColor: getRiskColor(item.risk) }]}>
-            <Text style={styles.riskText}>{item.risk}</Text>
+      <View style={styles.taskHazardItem}>
+        <TouchableOpacity 
+          style={styles.taskHazardRow}
+          onPress={() => handleTaskHazardInfo(item)}
+        >
+          <View style={styles.taskHazardInfo}>
+            <View style={styles.taskHazardHeader}>
+              <Text style={styles.taskHazardId}>#{item.id}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                <Text style={styles.statusText}>{item.status}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.scopeOfWork} numberOfLines={2}>
+              {item.scopeOfWork}
+            </Text>
+            
+            <View style={styles.taskHazardDetails}>
+              <View style={styles.detailRow}>
+                <Ionicons name="time-outline" size={14} color="#64748b" />
+                <Text style={styles.detailText}>{dateTime}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={14} color="#64748b" />
+                <Text style={styles.detailText} numberOfLines={1}>{item.location}</Text>
+              </View>
+              {item.supervisor && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="person-outline" size={14} color="#64748b" />
+                  <Text style={styles.detailText}>{item.supervisor}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.riskAndIndividuals}>
+              <View style={styles.riskContainer}>
+                <Text style={styles.riskLabel}>Risk Score: </Text>
+                <View style={[styles.riskBadge, { backgroundColor: getRiskColor(highestRisk) }]}>
+                  <Text style={styles.riskText}>{highestRisk}</Text>
+                </View>
+              </View>
+              
+              {item.individual && (
+                <Text style={styles.individualsText}>
+                  {item.individual.split(',').length} individual(s)
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
-        <View style={[styles.statusContainer, { flex: 0.8 }]}>
-          <Text style={[styles.statusText, { color: '#22c55e' }]}>
-            {item.status}
-          </Text>
-        </View>
-        <View style={[styles.actionsContainer, { flex: 0.6 }]}>
-          <TouchableOpacity style={styles.deleteButton}>
-            <Ionicons name="trash-outline" size={16} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
+          
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => handleTaskHazardInfo(item)}
+            >
+              <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => handleDeleteTaskHazard(item.id)}
+            >
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </View>
     );
   };
 
-  const totalPages = Math.ceil(taskHazards.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = taskHazards.slice(startIndex, endIndex);
+  const handleTaskHazardInfo = (taskHazard) => {
+    const highestRisk = calculateHighestRiskScore(taskHazard.risks);
+    const riskCount = taskHazard.risks?.length || 0;
+    const individualCount = taskHazard.individual ? taskHazard.individual.split(',').length : 0;
+    
+    const detailsText = [
+      `ID: ${taskHazard.id}`,
+      `Scope: ${taskHazard.scopeOfWork}`,
+      `Date/Time: ${taskHazard.date} ${taskHazard.time}`,
+      `Location: ${taskHazard.location}`,
+      `Status: ${taskHazard.status}`,
+      `Supervisor: ${taskHazard.supervisor || 'N/A'}`,
+      `Individuals: ${individualCount}`,
+      `Risks: ${riskCount}`,
+      `Highest Risk Score: ${highestRisk}`,
+      `System Lockout: ${taskHazard.systemLockoutRequired ? 'Yes' : 'No'}`,
+      `Trained Workforce: ${taskHazard.trainedWorkforce ? 'Yes' : 'No'}`,
+      `Created: ${new Date(taskHazard.createdAt).toLocaleDateString() || 'N/A'}`
+    ].join('\n');
+
+    Alert.alert(
+      'Task Hazard Details',
+      detailsText,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="warning-outline" size={64} color="#94a3b8" />
+      <Text style={styles.emptyStateTitle}>No Task Hazards Found</Text>
+      <Text style={styles.emptyStateText}>
+        {error ? 'Unable to load task hazards. Please try again.' : 'No task hazards have been created yet.'}
+      </Text>
+      {error && (
+        <TouchableOpacity style={styles.retryButton} onPress={() => fetchTaskHazards()}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="rgb(52, 73, 94)" />
+      <Text style={styles.loadingText}>Loading task hazards...</Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Task Hazard Assessment</Text>
+        </View>
+        {renderLoadingState()}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header with Title and Add Button */}
+      {/* Header with Add Task Hazard Button */}
       <View style={styles.header}>
         <Text style={styles.title}>Task Hazard Assessment</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => setShowAddModal(true)}
+        >
           <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>ADD NEW</Text>
+          <Text style={styles.addButtonText}>Add Task Hazard</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search tasks..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#94a3b8"
-          />
-        </View>
-      </View>
+      {/* Task Hazards List */}
+      {taskHazards.length > 0 ? (
+        <FlatList
+          data={taskHazards}
+          renderItem={renderTaskHazardItem}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.taskHazardsList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['rgb(52, 73, 94)']}
+              tintColor="rgb(52, 73, 94)"
+            />
+          }
+        />
+      ) : (
+        renderEmptyState()
+      )}
 
-      {/* Table Headers */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.tableContainer}>
-          <View style={styles.tableHeader}>
-            {tableHeaders.map((header) => (
-              <Text key={header.key} style={[styles.headerText, { flex: header.flex }]}>
-                {header.title}
-              </Text>
-            ))}
-          </View>
-
-          {/* Task Hazard List */}
-          <FlatList
-            data={currentItems}
-            renderItem={renderTaskHazardItem}
-            keyExtractor={(item) => item.id.toString()}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={false}
-          />
-        </View>
-      </ScrollView>
-
-      {/* Pagination */}
-      <View style={styles.paginationContainer}>
-        <Text style={styles.paginationText}>
-          Page {currentPage} of {totalPages} • Showing {currentItems.length} of {taskHazards.length} items
-        </Text>
-        <View style={styles.paginationButtons}>
-          <TouchableOpacity 
-            style={[styles.paginationButton, currentPage === 1 && styles.disabledButton]}
-            onPress={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-          >
-            <Text style={[styles.paginationButtonText, currentPage === 1 && styles.disabledText]}>
-              Previous
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.paginationButton, currentPage === totalPages && styles.disabledButton]}
-            onPress={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-          >
-            <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.disabledText]}>
-              Next
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* Add Task Hazard Modal */}
+      <AddTaskHazardModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleCreateTaskHazard}
+        isLoading={isCreatingTaskHazard}
+      />
     </View>
   );
 };
@@ -209,125 +345,149 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  searchContainer: {
-    padding: 20,
+  taskHazardsList: {
+    flex: 1,
+  },
+  taskHazardItem: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-    paddingVertical: 0,
-  },
-  tableContainer: {
-    minWidth: 800, // Ensure table is wide enough for all columns
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#f8fafc',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  headerText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    borderBottomColor: '#f1f5f9',
   },
   taskHazardRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    backgroundColor: '#fff',
   },
-  cellText: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '400',
+  taskHazardInfo: {
+    flex: 1,
+    marginRight: 16,
   },
-  riskContainer: {
-    alignItems: 'center',
-  },
-  riskBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  riskText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  statusContainer: {
-    alignItems: 'flex-start',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  actionsContainer: {
-    alignItems: 'center',
-  },
-  deleteButton: {
-    padding: 8,
-  },
-  paginationContainer: {
+  taskHazardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    marginBottom: 8,
   },
-  paginationText: {
+  taskHazardId: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#64748b',
   },
-  paginationButtons: {
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  scopeOfWork: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+    lineHeight: 22,
+  },
+  taskHazardDetails: {
+    marginBottom: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#64748b',
+    marginLeft: 6,
+    flex: 1,
+  },
+  riskAndIndividuals: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  riskContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  riskLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  riskBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  riskText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  individualsText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  actionButtons: {
     flexDirection: 'row',
     gap: 8,
   },
-  paginationButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  actionButton: {
+    padding: 8,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#fff',
   },
-  paginationButtonText: {
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
     fontSize: 14,
-    color: '#374151',
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
   },
-  disabledButton: {
-    backgroundColor: '#f9fafb',
+  retryButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
   },
-  disabledText: {
-    color: '#9ca3af',
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
