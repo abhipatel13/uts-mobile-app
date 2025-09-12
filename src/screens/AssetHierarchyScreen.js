@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,49 +6,146 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AssetHierarchyApi } from '../services';
+import { buildAssetHierarchy, flattenAssetHierarchy } from '../utils/assetUtils';
+import AddAssetModal from '../components/AddAssetModal';
 
 const AssetHierarchyScreen = () => {
   const [expandedItems, setExpandedItems] = useState({});
+  const [assets, setAssets] = useState([]);
+  const [flattenedAssets, setFlattenedAssets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isCreatingAsset, setIsCreatingAsset] = useState(false);
 
-  const assetData = [
-    {
-      id: '333-1753806400301',
-      name: 'ewrewr',
-      type: 'Root Asset',
-      hasChildren: true,
-      children: []
-    },
-    {
-      id: '222-1753806380318',
-      name: 'rrrr',
-      type: 'Root Asset',
-      hasChildren: false,
-      children: []
-    },
-    {
-      id: '3434-1753806278794',
-      name: 'rrrrr',
-      type: 'Root Asset',
-      hasChildren: false,
-      children: []
-    },
-    {
-      id: '001-1752711626749',
-      name: 'TESTING',
-      type: 'Root Asset',
-      hasChildren: true,
-      children: []
-    },
-    {
-      id: '11-1753806182435',
-      name: 'wwww',
-      type: 'Root Asset',
-      hasChildren: false,
-      children: []
+  // Load assets on component mount
+  useEffect(() => {
+    fetchAssets();
+  }, []);
+
+  // Update flattened assets when assets or expanded items change
+  useEffect(() => {
+    updateFlattenedAssets();
+  }, [assets, expandedItems]);
+
+  const fetchAssets = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      const response = await AssetHierarchyApi.getAll();
+      const apiAssets = response.data || [];
+
+      if (!Array.isArray(apiAssets)) {
+        throw new Error('Invalid response format from server');
+      }
+
+      setAssets(apiAssets);
+
+      // Auto-expand root assets on initial load
+      if (!isRefresh && apiAssets.length > 0) {
+        const rootAssets = apiAssets.filter(asset => !asset.parent);
+        const expandedState = {};
+        rootAssets.forEach(asset => {
+          expandedState[asset.id] = true;
+        });
+        setExpandedItems(expandedState);
+      }
+
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+      setError(error.message || 'Failed to load assets. Please try again.');
+      
+      // Show alert for errors
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to load assets. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  ];
+  };
+
+  const updateFlattenedAssets = () => {
+    if (assets.length === 0) {
+      setFlattenedAssets([]);
+      return;
+    }
+
+    // Build hierarchy
+    const hierarchicalAssets = buildAssetHierarchy(assets);
+    
+    // Flatten with respect to expanded state
+    const flattened = flattenHierarchyWithExpansion(hierarchicalAssets, 0);
+    setFlattenedAssets(flattened);
+  };
+
+  const flattenHierarchyWithExpansion = (hierarchicalAssets, level = 0) => {
+    let flattened = [];
+
+    hierarchicalAssets.forEach(asset => {
+      // Add current asset with level
+      flattened.push({
+        ...asset,
+        level,
+        hasChildren: asset.children && asset.children.length > 0
+      });
+
+      // Add children if expanded
+      if (asset.children && asset.children.length > 0 && expandedItems[asset.id]) {
+        flattened = flattened.concat(
+          flattenHierarchyWithExpansion(asset.children, level + 1)
+        );
+      }
+    });
+
+    return flattened;
+  };
+
+  const handleRefresh = () => {
+    fetchAssets(true);
+  };
+
+  const handleCreateAsset = async (assetData) => {
+    try {
+      setIsCreatingAsset(true);
+      
+      await AssetHierarchyApi.create(assetData);
+      
+      // Preserve current expansion state and expand parent if needed
+      const currentExpanded = { ...expandedItems };
+      if (assetData.assets[0].parent) {
+        currentExpanded[assetData.assets[0].parent] = true;
+      }
+      
+      // Refresh the asset list
+      await fetchAssets();
+      
+      // Restore expansion state
+      setExpandedItems(currentExpanded);
+      
+      Alert.alert('Success', 'Asset created successfully!');
+      
+    } catch (error) {
+      console.error('Error creating asset:', error);
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsCreatingAsset(false);
+    }
+  };
 
   const toggleExpand = (itemId) => {
     setExpandedItems(prev => ({
@@ -59,30 +156,40 @@ const AssetHierarchyScreen = () => {
 
   const renderAssetItem = ({ item }) => {
     const isExpanded = expandedItems[item.id];
+    const indentWidth = item.level * 20; // 20px per level
     
     return (
       <View style={styles.assetItem}>
         <TouchableOpacity 
-          style={styles.assetRow}
+          style={[styles.assetRow, { paddingLeft: 20 + indentWidth }]}
           onPress={() => item.hasChildren && toggleExpand(item.id)}
         >
           <View style={styles.assetInfo}>
             <View style={styles.expandContainer}>
-              {item.hasChildren && (
+              {item.hasChildren ? (
                 <Ionicons 
                   name={isExpanded ? "chevron-down" : "chevron-forward"} 
                   size={16} 
                   color="#64748b" 
                 />
+              ) : (
+                <View style={{ width: 16 }} />
               )}
-              <Text style={styles.assetId}>{item.id}</Text>
+              <Text style={styles.assetId}>
+                {item.cmmsInternalId || item.id}
+              </Text>
             </View>
             <View style={styles.assetDetails}>
               <Text style={styles.assetName}>{item.name}</Text>
-              <Text style={styles.assetType}>{item.type}</Text>
+              <Text style={styles.assetType}>
+                {item.objectType || (item.parent ? 'Child Asset' : 'Root Asset')}
+              </Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.infoButton}>
+          <TouchableOpacity 
+            style={styles.infoButton}
+            onPress={() => handleAssetInfo(item)}
+          >
             <Ionicons name="information-circle-outline" size={20} color="#64748b" />
           </TouchableOpacity>
         </TouchableOpacity>
@@ -90,30 +197,98 @@ const AssetHierarchyScreen = () => {
     );
   };
 
+  const handleAssetInfo = (asset) => {
+    Alert.alert(
+      'Asset Details',
+      `Name: ${asset.name}\nID: ${asset.cmmsInternalId || asset.id}\nDescription: ${asset.description || 'No description'}\nType: ${asset.objectType || 'N/A'}\nStatus: ${asset.systemStatus || 'N/A'}`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="folder-outline" size={64} color="#94a3b8" />
+      <Text style={styles.emptyStateTitle}>No Assets Found</Text>
+      <Text style={styles.emptyStateText}>
+        {error ? 'Unable to load assets. Please try again.' : 'No asset hierarchy data available.'}
+      </Text>
+      {error && (
+        <TouchableOpacity style={styles.retryButton} onPress={() => fetchAssets()}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="rgb(52, 73, 94)" />
+      <Text style={styles.loadingText}>Loading assets...</Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Asset Hierarchy</Text>
+        </View>
+        {renderLoadingState()}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header with Add Asset Button */}
       <View style={styles.header}>
         <Text style={styles.title}>Asset Hierarchy</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => setShowAddModal(true)}
+        >
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.addButtonText}>Add Asset</Text>
         </TouchableOpacity>
       </View>
 
       {/* Table Header */}
-      <View style={styles.tableHeader}>
-        <Text style={styles.columnHeader}>ID</Text>
-        <Text style={styles.columnHeader}>NAME</Text>
-      </View>
+      {flattenedAssets.length > 0 && (
+        <View style={styles.tableHeader}>
+          <Text style={styles.columnHeader}>ID</Text>
+          <Text style={styles.columnHeader}>NAME</Text>
+        </View>
+      )}
 
       {/* Asset List */}
-      <FlatList
-        data={assetData}
-        renderItem={renderAssetItem}
-        keyExtractor={(item) => item.id}
-        style={styles.assetList}
-        showsVerticalScrollIndicator={false}
+      {flattenedAssets.length > 0 ? (
+        <FlatList
+          data={flattenedAssets}
+          renderItem={renderAssetItem}
+          keyExtractor={(item) => item.id}
+          style={styles.assetList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['rgb(52, 73, 94)']}
+              tintColor="rgb(52, 73, 94)"
+            />
+          }
+        />
+      ) : (
+        renderEmptyState()
+      )}
+
+      {/* Add Asset Modal */}
+      <AddAssetModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleCreateAsset}
+        assets={assets}
+        isLoading={isCreatingAsset}
       />
     </View>
   );
@@ -217,6 +392,49 @@ const styles = StyleSheet.create({
   infoButton: {
     padding: 4,
     marginLeft: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

@@ -1,0 +1,56 @@
+import { api } from '../lib/api-client';
+
+export const TaskHazardApi = {
+  // Create new task hazard
+  create: async (data) => {
+    return api.post('/api/task-hazards', data);
+  },
+
+  // Get all task hazards
+  getAll: async (params = {}) => {
+    const queryParams = new URLSearchParams(params).toString();
+    return api.get(`/api/task-hazards${queryParams ? `?${queryParams}` : ''}`);
+  },
+
+  // Get task hazards by company (for universal users)
+  getByCompany: async (companyId, params = {}) => {
+    const queryParams = new URLSearchParams(params).toString();
+    return api.get(`/api/task-hazards/company/${companyId}${queryParams ? `?${queryParams}` : ''}`);
+  },
+
+  // Get a specific task hazard
+  getOne: async (id) => {
+    return api.get(`/api/task-hazards/${id}`);
+  },
+
+  // Update a task hazard
+  update: async (id, data) => {
+    return api.put(`/api/task-hazards/${id}`, { ...data, id });
+  },
+
+  // Delete a task hazard
+  delete: async (id) => {
+    return api.delete(`/api/task-hazards/${id}`);
+  },
+
+  // Delete a task hazard (universal user)
+  deleteUniversal: async (id) => {
+    return api.delete(`/api/task-hazards/universal/${id}`);
+  },
+
+  // Get supervisor approvals
+  getAllApprovals: async (params = {}) => {
+    const queryParams = new URLSearchParams(params).toString();
+    return api.get(`/api/task-hazards/approvals${queryParams ? `?${queryParams}` : ''}`);
+  },
+
+  // Supervisor approval action
+  supervisorApproval: async (data) => {
+    return api.post('/api/task-hazards/supervisor-approval', data);
+  },
+
+  // Get approval history for a task hazard
+  getApprovalHistory: async (id) => {
+    return api.get(`/api/task-hazards/${id}/approval-history`);
+  },
+};
