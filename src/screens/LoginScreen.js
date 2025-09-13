@@ -67,7 +67,7 @@ export default function LoginScreen({ navigation }) {
 
     try {
       // Call your backend API here
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch('https://18.188.112.65.nip.io/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

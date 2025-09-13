@@ -11,7 +11,7 @@ export const getAuthToken = async () => {
 };
 
 // API client configuration
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://18.188.112.65.nip.io';
 
 // API error class
 export class ApiError extends Error {

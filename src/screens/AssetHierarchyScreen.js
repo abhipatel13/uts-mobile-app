@@ -230,10 +230,6 @@ const AssetHierarchyScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Asset Hierarchy</Text>
-        </View>
         {renderLoadingState()}
       </View>
     );
@@ -242,8 +238,7 @@ const AssetHierarchyScreen = () => {
   return (
     <View style={styles.container}>
       {/* Header with Add Asset Button */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Asset Hierarchy</Text>
+      <View style={styles.headerCentered}>
         <TouchableOpacity 
           style={styles.addButton}
           onPress={() => setShowAddModal(true)}
@@ -302,6 +297,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  headerCentered: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
     backgroundColor: '#fff',
