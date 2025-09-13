@@ -1,222 +1,408 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   FlatList,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { UserApi } from '../services';
+import AddUserModal from '../components/AddUserModal';
+import EditUserModal from '../components/EditUserModal';
 
 const UserManagementScreen = () => {
-  // Sample user data matching your screenshot
-  const users = [
-    {
-      id: 1,
-      name: 'Test',
-      email: 'hello1@utahtechnicalservicesllc.com',
-      role: 'Superuser',
-      department: 'Engineering1',
-      phone: '6233012035',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 2,
-      name: '-',
-      email: 'hello2@utahtechnicalservicesllc.com',
-      role: 'Supervisor',
-      department: '-',
-      phone: '-',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 3,
-      name: 'ABHI0000',
-      email: 'hello3@utahtechnicalservicesllc.com',
-      role: 'Superuser',
-      department: 'Engineering',
-      phone: '6233012035',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 4,
-      name: '-',
-      email: 'hello4@utahtechnicalservicesllc.com',
-      role: 'User',
-      department: '-',
-      phone: '-',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 5,
-      name: '-',
-      email: 'abhi00@utahtechnicalllc.com',
-      role: 'Admin',
-      department: '-',
-      phone: '-',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 6,
-      name: '1111111',
-      email: 'test@test1.com',
-      role: 'Superuser',
-      department: '-',
-      phone: '-',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 7,
-      name: '111',
-      email: 'test22@gmail.com',
-      role: 'Superuser',
-      department: 'Engineering',
-      phone: '-',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 8,
-      name: '111',
-      email: 'test@tessst.com',
-      role: 'Superuser',
-      department: 'Engineering',
-      phone: '-',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 9,
-      name: 'Abhi1111111111',
-      email: 'abhi@test11.com',
-      role: 'Admin',
-      department: 'Engineering',
-      phone: '6233012035',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 10,
-      name: 'Abhi111',
-      email: 'abhi@ttt.com',
-      role: 'Admin',
-      department: 'Engineering',
-      phone: '6233012034',
-      company: 'Utah Technical Services LLC',
-    },
-    {
-      id: 11,
-      name: 'Abhi',
-      email: 'apate337@gmail.com',
-      role: 'Superuser',
-      department: 'TEST',
-      phone: '123',
-      company: 'Utah Technical Services LLC',
-    },
-  ];
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+  
+  // Current user info (you might want to get this from context/auth)
+  const [currentUser] = useState({ role: 'superuser' }); // This should come from auth context
 
-  const tableHeaders = [
-    { key: 'name', title: 'NAME', flex: 1 },
-    { key: 'email', title: 'EMAIL', flex: 1.5 },
-    { key: 'role', title: 'ROLE', flex: 0.8 },
-    { key: 'department', title: 'DEPARTMENT', flex: 1 },
-    { key: 'phone', title: 'PHONE', flex: 1 },
-    { key: 'company', title: 'COMPANY', flex: 1.2 },
-    { key: 'actions', title: 'ACTIONS', flex: 1.5 },
-  ];
+  // Load users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Filter users based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredUsers(users);
+    } else {
+      const filtered = users.filter(user =>
+        user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.department?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredUsers(filtered);
+    }
+  }, [users, searchQuery]);
+
+  const fetchUsers = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      const response = await UserApi.getAll();
+      const apiUsers = response.data || [];
+
+      if (!Array.isArray(apiUsers)) {
+        throw new Error('Invalid response format from server');
+      }
+
+      setUsers(apiUsers);
+
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setError(error.message || 'Failed to load users. Please try again.');
+      
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to load users. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchUsers(true);
+  };
+
+  const handleCreateUser = async (userData) => {
+    try {
+      setIsCreatingUser(true);
+      
+      await UserApi.create(userData);
+      
+      // Refresh users list
+      await fetchUsers();
+      
+      Alert.alert('Success', 'User created successfully!');
+      
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async (userId, userData) => {
+    try {
+      setIsUpdatingUser(true);
+      
+      await UserApi.update(userId, userData);
+      
+      // Refresh users list
+      await fetchUsers();
+      
+      Alert.alert('Success', 'User updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsUpdatingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (user) => {
+    Alert.alert(
+      'Delete User',
+      `Are you sure you want to delete ${user.name || user.email}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await UserApi.delete(user.id);
+              await fetchUsers();
+              Alert.alert('Success', 'User deleted successfully!');
+            } catch (error) {
+              console.error('Error deleting user:', error);
+              Alert.alert('Error', error.message || 'Failed to delete user');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleResetPassword = async (user) => {
+    Alert.prompt(
+      'Reset Password',
+      `Enter new password for ${user.name || user.email}:`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          onPress: async (newPassword) => {
+            if (!newPassword || newPassword.length < 6) {
+              Alert.alert('Error', 'Password must be at least 6 characters long');
+              return;
+            }
+            
+            try {
+              await UserApi.resetPassword(user.id, newPassword);
+              Alert.alert('Success', 'Password reset successfully!');
+            } catch (error) {
+              console.error('Error resetting password:', error);
+              Alert.alert('Error', error.message || 'Failed to reset password');
+            }
+          }
+        }
+      ],
+      'secure-text'
+    );
+  };
 
   const getRoleColor = (role) => {
-    switch (role.toLowerCase()) {
-      case 'superuser':
-        return '#3b82f6';
-      case 'admin':
-        return '#10b981';
-      case 'supervisor':
-        return '#f59e0b';
-      case 'user':
-        return '#64748b';
-      default:
-        return '#64748b';
+    switch (role?.toLowerCase()) {
+      case 'universal_user': return '#8b5cf6';
+      case 'superuser': return '#3b82f6';
+      case 'admin': return '#10b981';
+      case 'supervisor': return '#f59e0b';
+      case 'user': return '#64748b';
+      default: return '#64748b';
     }
   };
 
   const renderUserItem = ({ item }) => {
     return (
-      <View style={styles.userRow}>
-        <Text style={[styles.cellText, { flex: 1 }]} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={[styles.cellText, { flex: 1.5, fontSize: 12 }]} numberOfLines={1}>
-          {item.email}
-        </Text>
-        <View style={[styles.roleContainer, { flex: 0.8 }]}>
-          <View style={[styles.roleBadge, { backgroundColor: getRoleColor(item.role) }]}>
-            <Text style={styles.roleText}>{item.role}</Text>
+      <View style={styles.userCard}>
+        <TouchableOpacity 
+          style={styles.userCardContent}
+          onPress={() => handleEditUser(item)}
+          activeOpacity={0.7}
+        >
+          {/* Header */}
+          <View style={styles.userHeader}>
+            <View style={styles.userInfo}>
+              <View style={styles.userAvatar}>
+                <Text style={styles.userAvatarText}>
+                  {(item.name || item.email || 'U').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.userDetails}>
+                <Text style={styles.userName}>{item.name || 'No Name'}</Text>
+                <Text style={styles.userEmail}>{item.email}</Text>
+              </View>
+            </View>
+            <View style={[styles.roleBadge, { backgroundColor: getRoleColor(item.role) }]}>
+              <Text style={styles.roleText}>
+                {item.role?.split('_').map(word => 
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ') || 'User'}
+              </Text>
+            </View>
           </View>
-        </View>
-        <Text style={[styles.cellText, { flex: 1 }]} numberOfLines={1}>
-          {item.department}
-        </Text>
-        <Text style={[styles.cellText, { flex: 1 }]} numberOfLines={1}>
-          {item.phone}
-        </Text>
-        <Text style={[styles.cellText, { flex: 1.2, fontSize: 11 }]} numberOfLines={1}>
-          {item.company}
-        </Text>
-        <View style={[styles.actionsContainer, { flex: 1.5 }]}>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#3b82f6' }]}>
-            <Text style={styles.actionButtonText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#f59e0b' }]}>
-            <Text style={styles.actionButtonText}>Reset Password</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#ef4444' }]}>
-            <Text style={styles.actionButtonText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
+
+          {/* Details */}
+          <View style={styles.userMetadata}>
+            {item.department && item.department !== '-' && (
+              <View style={styles.metadataItem}>
+                <Ionicons name="business-outline" size={14} color="#64748b" />
+                <Text style={styles.metadataText}>{item.department}</Text>
+              </View>
+            )}
+            {item.phone && item.phone !== '-' && (
+              <View style={styles.metadataItem}>
+                <Ionicons name="call-outline" size={14} color="#64748b" />
+                <Text style={styles.metadataText}>{item.phone}</Text>
+              </View>
+            )}
+            {item.company && (
+              <View style={styles.metadataItem}>
+                <Ionicons name="building-outline" size={14} color="#64748b" />
+                <Text style={styles.metadataText}>{item.company.name || item.company}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Actions */}
+          <View style={styles.userActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.editButton]}
+              onPress={() => handleEditUser(item)}
+            >
+              <Ionicons name="create-outline" size={16} color="#fff" />
+              <Text style={styles.actionButtonText}>Edit</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, styles.resetButton]}
+              onPress={() => handleResetPassword(item)}
+            >
+              <Ionicons name="key-outline" size={16} color="#fff" />
+              <Text style={styles.actionButtonText}>Reset</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton]}
+              onPress={() => handleDeleteUser(item)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </View>
     );
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="rgb(52, 73, 94)" />
+        <Text style={styles.loadingText}>Loading users...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error && !users.length) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+        <Text style={styles.errorTitle}>Failed to load users</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => fetchUsers()}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>User Management</Text>
-          <Text style={styles.subtitle}>Manage users for Utah Technical Services LLC</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>User Management</Text>
+            <Text style={styles.subtitle}>
+              {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+              {searchQuery ? ` found` : ` total`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Ionicons name="person-add-outline" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={[styles.headerButton, { backgroundColor: '#3b82f6' }]}>
-            <Ionicons name="cloud-upload-outline" size={16} color="#fff" />
-            <Text style={styles.headerButtonText}>Bulk Upload</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.headerButton, { backgroundColor: 'rgb(52, 73, 94)' }]}>
-            <Text style={styles.headerButtonText}>Create New User</Text>
-          </TouchableOpacity>
+
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={20} color="#64748b" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search users by name, email, role..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery ? (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={() => setSearchQuery('')}
+            >
+              <Ionicons name="close-circle" size={20} color="#64748b" />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
-      {/* Table */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.tableContainer}>
-          {/* Table Headers */}
-          <View style={styles.tableHeader}>
-            {tableHeaders.map((header) => (
-              <Text key={header.key} style={[styles.headerText, { flex: header.flex }]}>
-                {header.title}
-              </Text>
-            ))}
-          </View>
-
-          {/* User List */}
-          <FlatList
-            data={users}
-            renderItem={renderUserItem}
-            keyExtractor={(item) => item.id.toString()}
-            showsVerticalScrollIndicator={false}
-            style={styles.userList}
+      {/* User List */}
+      <FlatList
+        data={filteredUsers}
+        renderItem={renderUserItem}
+        keyExtractor={(item) => item.id.toString()}
+        style={styles.userList}
+        contentContainerStyle={styles.userListContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['rgb(52, 73, 94)']}
           />
-        </View>
-      </ScrollView>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="people-outline" size={64} color="#d1d5db" />
+            <Text style={styles.emptyStateTitle}>
+              {searchQuery ? 'No users found' : 'No users yet'}
+            </Text>
+            <Text style={styles.emptyStateText}>
+              {searchQuery 
+                ? 'Try adjusting your search terms'
+                : 'Create your first user to get started'
+              }
+            </Text>
+            {!searchQuery && (
+              <TouchableOpacity
+                style={styles.emptyStateButton}
+                onPress={() => setShowAddModal(true)}
+              >
+                <Text style={styles.emptyStateButtonText}>Add First User</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        }
+      />
+
+      {/* Modals */}
+      <AddUserModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleCreateUser}
+        isLoading={isCreatingUser}
+        currentUserRole={currentUser.role}
+      />
+
+      <EditUserModal
+        visible={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedUser(null);
+        }}
+        onSubmit={handleUpdateUser}
+        user={selectedUser}
+        isLoading={isUpdatingUser}
+        currentUserRole={currentUser.role}
+      />
     </View>
   );
 };
@@ -224,16 +410,54 @@ const UserManagementScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
+    backgroundColor: '#fff',
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   headerContent: {
     flex: 1,
@@ -248,11 +472,128 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
   },
-  headerButtons: {
+  addButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    marginHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1e293b',
+  },
+  clearButton: {
+    marginLeft: 8,
+  },
+  userList: {
+    flex: 1,
+  },
+  userListContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  userCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  userCardContent: {
+    padding: 16,
+  },
+  userHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgb(52, 73, 94)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  userAvatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  roleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  roleText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  userMetadata: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    gap: 12,
+  },
+  metadataItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metadataText: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  userActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: 8,
   },
-  headerButton: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -260,72 +601,50 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  headerButtonText: {
+  editButton: {
+    backgroundColor: '#3b82f6',
+  },
+  resetButton: {
+    backgroundColor: '#f59e0b',
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 10,
+  },
+  actionButtonText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '500',
   },
-  tableContainer: {
-    minWidth: 1000, // Ensure table is wide enough for all columns
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#f8fafc',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  headerText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  userList: {
-    flex: 1,
-  },
-  userRow: {
-    flexDirection: 'row',
+  emptyState: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    backgroundColor: '#fff',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
-  cellText: {
-    fontSize: 13,
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#1e293b',
-    fontWeight: '400',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  roleContainer: {
-    alignItems: 'flex-start',
+  emptyStateText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
   },
-  roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  emptyStateButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  roleText: {
+  emptyStateButtonText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  actionButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

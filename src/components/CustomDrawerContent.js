@@ -11,6 +11,7 @@ import {
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/AuthService';
+import { triggerGlobalLogout } from '../../App';
 
 const menuItems = [
   {
@@ -147,11 +148,8 @@ export default function CustomDrawerContent(props) {
           onPress: async () => {
             try {
               await AuthService.logout();
-              // Navigation will be handled by the auth state change in App.js
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
+              // Trigger global logout to update auth state in App.js
+              triggerGlobalLogout();
             } catch (error) {
               console.error('Logout error:', error);
               Alert.alert('Error', 'Failed to logout. Please try again.');
