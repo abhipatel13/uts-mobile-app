@@ -48,13 +48,6 @@ const DashboardScreen = ({ navigation }) => {
       color: '#f97316',
       route: 'Analytics',
     },
-    {
-      title: 'Configuration',
-      description: 'Manage system configurations',
-      icon: 'cog-outline',
-      color: '#a855f7',
-      route: 'Configurations',
-    },
   ];
 
   const quickActions = [
