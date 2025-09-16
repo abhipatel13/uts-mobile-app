@@ -16,7 +16,6 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import AssetHierarchyScreen from './src/screens/AssetHierarchyScreen';
 import SafetyScreen from './src/screens/SafetyScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
-import ConfigurationsScreen from './src/screens/ConfigurationsScreen';
 import TaskHazardScreen from './src/screens/TaskHazardScreen';
 import RiskAssessmentScreen from './src/screens/RiskAssessmentScreen';
 import TaskHazardAnalyticsScreen from './src/screens/TaskHazardAnalyticsScreen';
@@ -137,13 +136,6 @@ function MainAppNavigator() {
         component={AnalyticsScreen}
         options={{
           title: 'Analytics',
-        }}
-      />
-      <Stack.Screen 
-        name="Configurations" 
-        component={ConfigurationsScreen}
-        options={{
-          title: 'Configurations',
         }}
       />
       <Stack.Screen 

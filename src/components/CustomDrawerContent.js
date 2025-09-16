@@ -51,25 +51,6 @@ const menuItems = [
       { name: 'Risk Assessment', route: 'AnalyticsRiskAssessment' },
     ],
   },
-  {
-    name: 'Configurations',
-    icon: 'cog-outline',
-    route: 'Configurations',
-    color: '#a855f7',
-    hasSubItems: true,
-    subItems: [
-      { 
-        name: 'Admin', 
-        route: 'ConfigAdmin',
-        hasSubItems: true,
-        subItems: [
-          { name: 'User Management', route: 'UserManagement' },
-          { name: 'Data Loader', route: 'DataLoader' },
-          { name: 'Licensing', route: 'Licensing' },
-        ]
-      },
-    ],
-  },
 ];
 
 export default function CustomDrawerContent(props) {
