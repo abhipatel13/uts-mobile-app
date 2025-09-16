@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardApi } from '../services';
 import AddTaskHazardModal from '../components/AddTaskHazardModal';
+import TaskHazardMapView from '../components/TaskHazardMapView';
 
 const TaskHazardScreen = () => {
   const [taskHazards, setTaskHazards] = useState([]);
@@ -21,6 +22,7 @@ const TaskHazardScreen = () => {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreatingTaskHazard, setIsCreatingTaskHazard] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
   // Load task hazards on component mount
   useEffect(() => {
@@ -268,35 +270,84 @@ const TaskHazardScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header with Add Task Hazard Button */}
+      {/* Header with View Toggle and Add Button */}
       <View style={styles.header}>
         <Text style={styles.title}>Task Hazard Assessment</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add Task Hazard</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* View Toggle */}
+          <View style={styles.viewToggle}>
+            <TouchableOpacity 
+              style={[styles.toggleButton, viewMode === 'list' && styles.activeToggleButton]}
+              onPress={() => setViewMode('list')}
+            >
+              <Ionicons 
+                name="list-outline" 
+                size={18} 
+                color={viewMode === 'list' ? '#fff' : '#64748b'} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleButton, viewMode === 'map' && styles.activeToggleButton]}
+              onPress={() => setViewMode('map')}
+            >
+              <Ionicons 
+                name="map-outline" 
+                size={18} 
+                color={viewMode === 'map' ? '#fff' : '#64748b'} 
+              />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Add Button */}
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Task Hazards List */}
+      {/* Content Area - List or Map View */}
       {taskHazards.length > 0 ? (
-        <FlatList
-          data={taskHazards}
-          renderItem={renderTaskHazardItem}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.taskHazardsList}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              colors={['rgb(52, 73, 94)']}
-              tintColor="rgb(52, 73, 94)"
+        viewMode === 'list' ? (
+          <FlatList
+            data={taskHazards}
+            renderItem={renderTaskHazardItem}
+            keyExtractor={(item) => item.id.toString()}
+            style={styles.taskHazardsList}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                colors={['rgb(52, 73, 94)']}
+                tintColor="rgb(52, 73, 94)"
+              />
+            }
+          />
+        ) : (
+          <ScrollView 
+            style={styles.mapViewContainer}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                colors={['rgb(52, 73, 94)']}
+                tintColor="rgb(52, 73, 94)"
+              />
+            }
+          >
+            <TaskHazardMapView
+              taskHazards={taskHazards}
+              onMarkerPress={handleTaskHazardInfo}
+              getRiskColor={getRiskColor}
+              getStatusColor={getStatusColor}
+              isLoading={isLoading}
             />
-          }
-        />
+          </ScrollView>
+        )
       ) : (
         renderEmptyState()
       )}
@@ -330,6 +381,33 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1e293b',
+    flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+    padding: 2,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeToggleButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   addButton: {
     flexDirection: 'row',
@@ -488,6 +566,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
+  },
+  mapViewContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
 });
 

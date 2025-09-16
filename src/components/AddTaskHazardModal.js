@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import TaskRisksComponent from './TaskRisksComponent';
+import SimpleMapView from './SimpleMapView';
 
 const AddTaskHazardModal = ({ 
   visible, 
@@ -37,7 +38,9 @@ const AddTaskHazardModal = ({
 
   const [errors, setErrors] = useState({});
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 4;
+  const [mapType, setMapType] = useState('standard');
+  const [isMapLoading, setIsMapLoading] = useState(false);
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -89,6 +92,61 @@ const AddTaskHazardModal = ({
         [field]: null
       }));
     }
+  };
+
+  // Map related functions
+  const handleMapTypeChange = (type) => {
+    setMapType(type);
+  };
+
+  const handleMarkerPress = (location) => {
+    Alert.alert(
+      'Location Details',
+      `Location: ${location.name}\nStatus: ${formData.status}\nRisks: ${formData.risks.length}`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const getRiskColor = (riskScore) => {
+    if (riskScore >= 17) return '#991b1b'; // Critical - Dark red
+    if (riskScore >= 10) return '#ef4444'; // High - Red
+    if (riskScore >= 5) return '#f59e0b';  // Medium - Orange
+    return '#22c55e'; // Low - Green
+  };
+
+  // Create location data based on form location
+  const getLocationData = () => {
+    if (!formData.location) return [];
+    
+    // Parse coordinates from location string or use default
+    const defaultCoords = { latitude: 40.7128, longitude: -74.0060 }; // NYC default
+    let coords = defaultCoords;
+    
+    // Try to parse if location contains coordinates
+    const coordMatch = formData.location.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
+    if (coordMatch) {
+      coords = {
+        latitude: parseFloat(coordMatch[1]),
+        longitude: parseFloat(coordMatch[2])
+      };
+    }
+
+    // Calculate average risk score from form risks
+    const avgRiskScore = formData.risks.length > 0 
+      ? formData.risks.reduce((sum, risk) => {
+          const asIsScore = (parseInt(risk.asIsLikelihood) || 1) * (parseInt(risk.asIsConsequence) || 1);
+          return sum + asIsScore;
+        }, 0) / formData.risks.length
+      : 1;
+
+    return [{
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      name: formData.location,
+      count: formData.risks.length,
+      riskScore: Math.round(avgRiskScore),
+      status: formData.status
+    }];
   };
 
   const validateStep = (step) => {
@@ -202,7 +260,7 @@ const AddTaskHazardModal = ({
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
-      {[1, 2, 3].map((step) => (
+      {[1, 2, 3, 4].map((step) => (
         <View key={step} style={styles.stepItem}>
           <View style={[
             styles.stepCircle, 
@@ -217,7 +275,7 @@ const AddTaskHazardModal = ({
             </Text>
           </View>
           <Text style={[styles.stepLabel, currentStep === step && styles.stepLabelActive]}>
-            {step === 1 ? 'Basic Info' : step === 2 ? 'Personnel' : 'Risks'}
+            {step === 1 ? 'Basic Info' : step === 2 ? 'Personnel' : step === 3 ? 'Risks' : 'Risk Status'}
           </Text>
         </View>
       ))}
@@ -363,21 +421,6 @@ const AddTaskHazardModal = ({
         {errors.individual && <Text style={styles.errorText}>{errors.individual}</Text>}
       </View>
 
-      {/* Status */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Status</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.status}
-            onValueChange={(value) => handleInputChange('status', value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Pending" value="Pending" />
-            <Picker.Item label="Active" value="Active" />
-            <Picker.Item label="Inactive" value="Inactive" />
-          </Picker>
-        </View>
-      </View>
     </ScrollView>
   );
 
@@ -393,6 +436,46 @@ const AddTaskHazardModal = ({
     </View>
   );
 
+  const renderRiskStatus = () => (
+    <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
+      {/* Status */}
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Risk Status</Text>
+        <Text style={styles.helpText}>
+          Select the current status of this task hazard assessment
+        </Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={formData.status}
+            onValueChange={(value) => handleInputChange('status', value)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Pending" value="Pending" />
+            <Picker.Item label="Active" value="Active" />
+            <Picker.Item label="Inactive" value="Inactive" />
+          </Picker>
+        </View>
+        {errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
+      </View>
+
+      {/* Risk Location Map */}
+      <View style={styles.mapSection}>
+        <Text style={styles.label}>Risk Location Overview</Text>
+        <Text style={styles.helpText}>
+          Visual overview of the task hazard location and risk assessment
+        </Text>
+        <SimpleMapView
+          locationData={getLocationData()}
+          mapType={mapType}
+          onMapTypeChange={handleMapTypeChange}
+          onMarkerPress={handleMarkerPress}
+          getRiskColor={getRiskColor}
+          isLoading={isMapLoading}
+        />
+      </View>
+    </ScrollView>
+  );
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -401,6 +484,8 @@ const AddTaskHazardModal = ({
         return renderPersonnel();
       case 3:
         return renderRiskAssessment();
+      case 4:
+        return renderRiskStatus();
       default:
         return renderBasicInformation();
     }
@@ -680,6 +765,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  mapSection: {
+    marginTop: 20,
   },
 });
 
