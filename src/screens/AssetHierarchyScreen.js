@@ -13,7 +13,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { AssetHierarchyApi } from '../services';
 import { buildAssetHierarchy, flattenAssetHierarchy } from '../utils/assetUtils';
-import AddAssetModal from '../components/AddAssetModal';
 
 const AssetHierarchyScreen = () => {
   const [expandedItems, setExpandedItems] = useState({});
@@ -22,8 +21,6 @@ const AssetHierarchyScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [isCreatingAsset, setIsCreatingAsset] = useState(false);
 
   // Load assets on component mount
   useEffect(() => {
@@ -119,33 +116,6 @@ const AssetHierarchyScreen = () => {
     fetchAssets(true);
   };
 
-  const handleCreateAsset = async (assetData) => {
-    try {
-      setIsCreatingAsset(true);
-      
-      await AssetHierarchyApi.create(assetData);
-      
-      // Preserve current expansion state and expand parent if needed
-      const currentExpanded = { ...expandedItems };
-      if (assetData.assets[0].parent) {
-        currentExpanded[assetData.assets[0].parent] = true;
-      }
-      
-      // Refresh the asset list
-      await fetchAssets();
-      
-      // Restore expansion state
-      setExpandedItems(currentExpanded);
-      
-      Alert.alert('Success', 'Asset created successfully!');
-      
-    } catch (error) {
-      console.error('Error creating asset:', error);
-      throw error; // Re-throw to let modal handle it
-    } finally {
-      setIsCreatingAsset(false);
-    }
-  };
 
   const toggleExpand = (itemId) => {
     setExpandedItems(prev => ({
@@ -237,16 +207,6 @@ const AssetHierarchyScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header with Add Asset Button */}
-      <View style={styles.headerCentered}>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add Asset</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Table Header */}
       {flattenedAssets.length > 0 && (
@@ -277,14 +237,6 @@ const AssetHierarchyScreen = () => {
         renderEmptyState()
       )}
 
-      {/* Add Asset Modal */}
-      <AddAssetModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleCreateAsset}
-        assets={assets}
-        isLoading={isCreatingAsset}
-      />
     </View>
   );
 };
@@ -302,34 +254,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-  },
-  headerCentered: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgb(52, 73, 94)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    gap: 6,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
   },
   tableHeader: {
     flexDirection: 'row',
