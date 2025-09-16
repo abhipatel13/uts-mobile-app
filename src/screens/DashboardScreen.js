@@ -28,13 +28,6 @@ const DashboardScreen = ({ navigation }) => {
       route: 'AssetHierarchy',
     },
     {
-      title: 'Tactics',
-      description: 'Manage and configure tactics',
-      icon: 'settings-outline',
-      color: '#ef4444',
-      route: 'Tactics',
-    },
-    {
       title: 'Task Hazard',
       description: 'Create and manage task hazard assessments',
       icon: 'shield-checkmark-outline',
