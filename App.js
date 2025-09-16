@@ -14,7 +14,6 @@ const navigationRef = createRef();
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import AssetHierarchyScreen from './src/screens/AssetHierarchyScreen';
-import TacticsScreen from './src/screens/TacticsScreen';
 import SafetyScreen from './src/screens/SafetyScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import ConfigurationsScreen from './src/screens/ConfigurationsScreen';
@@ -124,13 +123,6 @@ function MainAppNavigator() {
         component={AssetHierarchyScreen}
         options={{
           title: 'Asset Hierarchy',
-        }}
-      />
-      <Stack.Screen 
-        name="Tactics" 
-        component={TacticsScreen}
-        options={{
-          title: 'Tactics',
         }}
       />
       <Stack.Screen 

@@ -29,13 +29,6 @@ const menuItems = [
     hasSubItems: false,
   },
   {
-    name: 'Tactics',
-    icon: 'settings-outline',
-    route: 'Tactics',
-    color: '#ef4444',
-    hasSubItems: false,
-  },
-  {
     name: 'Safety',
     icon: 'shield-checkmark-outline',
     route: 'Safety',
