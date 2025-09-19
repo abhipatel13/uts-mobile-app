@@ -70,6 +70,8 @@ const TaskHazardScreen = () => {
   const handleCreateTaskHazard = async (taskHazardData) => {
     try {
       setIsCreatingTaskHazard(true);
+
+      console.log('taskHazardData', taskHazardData);
       
       await TaskHazardApi.create(taskHazardData);
       
@@ -272,7 +274,6 @@ const TaskHazardScreen = () => {
     <View style={styles.container}>
       {/* Header with View Toggle and Add Button */}
       <View style={styles.header}>
-        <Text style={styles.title}>Task Hazard Assessment</Text>
         <View style={styles.headerActions}>
           {/* View Toggle */}
           <View style={styles.viewToggle}>

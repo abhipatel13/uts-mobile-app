@@ -1,0 +1,572 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  Animated,
+  Dimensions,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+const RiskMatrixModal = ({ 
+  visible, 
+  onClose, 
+  onSelect,
+  riskType = 'Personnel',
+  title = 'Risk Assessment',
+  isPostMitigation = false,
+  selectedLikelihood,
+  selectedConsequence,
+  requiresSupervisorSignature = false
+}) => {
+  const [selectedCell, setSelectedCell] = useState(null);
+  const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+
+  const likelihoodLabels = [
+    { value: "Very Unlikely", label: "Very Unlikely", description: "Once in Lifetime >75 Years", score: 1 },
+    { value: "Slight Chance", label: "Slight Chance", description: "Once in 10 to 75 Years", score: 2 },
+    { value: "Feasible", label: "Feasible", description: "Once in 10 Years", score: 3 },
+    { value: "Likely", label: "Likely", description: "Once in 2 to 10 Years", score: 4 },
+    { value: "Very Likely", label: "Very Likely", description: "Multiple times in 2 Years", score: 5 },
+  ];
+
+  const getConsequenceLabels = (riskType) => {
+    switch (riskType) {
+      case "Personnel":
+        return [
+          { value: "Minor", label: "Minor", description: "No Lost Time", score: 1 },
+          { value: "Significant", label: "Significant", description: "Lost Time", score: 2 },
+          { value: "Serious", label: "Serious", description: "Short Term Disability", score: 3 },
+          { value: "Major", label: "Major", description: "Long Term Disability", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: "Fatality", score: 5 },
+        ];
+      case "Maintenance":
+        return [
+          { value: "Minor", label: "Minor", description: "<5% Impact to Maintenance Budget", score: 1 },
+          { value: "Significant", label: "Significant", description: "5-10% Impact to Maintenance Budget", score: 2 },
+          { value: "Serious", label: "Serious", description: "20-30% Impact to Maintenance Budget", score: 3 },
+          { value: "Major", label: "Major", description: "30-40% Impact to Maintenance Budget", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: ">41% Impact to Maintenance Budget", score: 5 },
+        ];
+      case "Revenue":
+        return [
+          { value: "Minor", label: "Minor", description: "<2% Impact to Revenue", score: 1 },
+          { value: "Significant", label: "Significant", description: "2-6% Impact to Revenue", score: 2 },
+          { value: "Serious", label: "Serious", description: "6-12% Impact to Revenue", score: 3 },
+          { value: "Major", label: "Major", description: "12-24% Impact to Revenue", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: ">25% Impact to Revenue", score: 5 },
+        ];
+      case "Process":
+        return [
+          { value: "Minor", label: "Minor", description: "Production Loss < 10 Days", score: 1 },
+          { value: "Significant", label: "Significant", description: "Production Loss 10 - 20 Days", score: 2 },
+          { value: "Serious", label: "Serious", description: "Production Loss 20 - 40 Days", score: 3 },
+          { value: "Major", label: "Major", description: "Production Loss 40 - 80 Days", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: "Production Loss >81 Days", score: 5 },
+        ];
+      case "Environmental":
+        return [
+          { value: "Minor", label: "Minor", description: "Near Source - Non Reportable - Cleanup <1Shift", score: 1 },
+          { value: "Significant", label: "Significant", description: "Near Source - Reportable - Cleanup <1Shift", score: 2 },
+          { value: "Serious", label: "Serious", description: "Near Source - Reportable - Cleanup <4WKS", score: 3 },
+          { value: "Major", label: "Major", description: "Near Source - Reportable - Cleanup <52WKS", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: "Near Source - Reportable - Cleanup <1WK", score: 5 },
+        ];
+      default:
+        return getConsequenceLabels("Personnel");
+    }
+  };
+
+  const consequenceLabels = getConsequenceLabels(riskType);
+
+  // Risk matrix scores
+  const riskMatrix = [
+    [1, 2, 3, 4, 5],    // Very Unlikely (1)
+    [2, 4, 6, 8, 10],   // Slight Chance (2)
+    [3, 6, 9, 12, 15],  // Feasible (3)
+    [4, 8, 12, 16, 20], // Likely (4)
+    [5, 10, 15, 20, 25] // Very Likely (5)
+  ];
+
+  const getRiskScore = (likelihoodIndex, consequenceIndex) => {
+    return riskMatrix[likelihoodIndex][consequenceIndex];
+  };
+
+  const getRiskColor = (score) => {
+    if (score <= 2) return '#8DC63F'; // Low Risk - Green
+    if (score <= 9) return '#FFFF00'; // Medium Risk - Yellow
+    if (score <= 15) return '#F7941D'; // High Risk - Orange
+    return '#ED1C24'; // Critical Risk - Red
+  };
+
+  const getRiskColorCategory = (score) => {
+    if (score <= 2) return 'Low Risk (1-2)';
+    if (score <= 9) return 'Medium Risk (3-9)';
+    if (score <= 15) return 'High Risk (10-15)';
+    return 'Critical Risk (16-25)';
+  };
+
+  const handleCellPress = (likelihoodIndex, consequenceIndex) => {
+    const likelihood = likelihoodLabels[likelihoodIndex];
+    const consequence = consequenceLabels[consequenceIndex];
+    const score = getRiskScore(likelihoodIndex, consequenceIndex);
+    
+    setSelectedCell({ 
+      likelihood, 
+      consequence, 
+      score, 
+      likelihoodIndex, 
+      consequenceIndex 
+    });
+  };
+
+  const handleDone = () => {
+    if (selectedCell) {
+      onSelect(selectedCell.likelihood.value, selectedCell.consequence.value, selectedCell.score);
+    }
+    onClose();
+  };
+
+  // Set initial selection if provided
+  useEffect(() => {
+    if (selectedLikelihood && selectedConsequence) {
+      const likelihoodIndex = likelihoodLabels.findIndex(l => l.value === selectedLikelihood);
+      const consequenceIndex = consequenceLabels.findIndex(c => c.value === selectedConsequence);
+      
+      if (likelihoodIndex !== -1 && consequenceIndex !== -1) {
+        const likelihood = likelihoodLabels[likelihoodIndex];
+        const consequence = consequenceLabels[consequenceIndex];
+        const score = getRiskScore(likelihoodIndex, consequenceIndex);
+        setSelectedCell({ 
+          likelihood, 
+          consequence, 
+          score, 
+          likelihoodIndex, 
+          consequenceIndex 
+        });
+      }
+    }
+  }, [selectedLikelihood, selectedConsequence, riskType]);
+
+  const renderMatrixCell = (likelihoodIndex, consequenceIndex) => {
+    const score = getRiskScore(likelihoodIndex, consequenceIndex);
+    const isSelected = selectedCell && 
+      selectedCell.likelihoodIndex === likelihoodIndex && 
+      selectedCell.consequenceIndex === consequenceIndex;
+    
+    return (
+      <TouchableOpacity
+        key={`${likelihoodIndex}-${consequenceIndex}`}
+        style={[
+          styles.matrixCell,
+          { backgroundColor: getRiskColor(score) },
+          isSelected && styles.selectedCell
+        ]}
+        onPress={() => handleCellPress(likelihoodIndex, consequenceIndex)}
+      >
+        <Text style={styles.matrixCellText}>{score}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="overFullScreen"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            {title} - {riskType} Assessment
+          </Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close" size={24} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Supervisor Signature Warning for Post-Mitigation */}
+          {isPostMitigation && requiresSupervisorSignature && (
+            <View style={styles.supervisorWarning}>
+              <View style={styles.supervisorWarningContent}>
+                <Ionicons name="warning" size={20} color="#f59e0b" />
+                <Text style={styles.supervisorWarningText}>
+                  Supervisor Signature Required for High Risk ({'>'}9)
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Risk Type Badge */}
+          <View style={styles.riskTypeBadge}>
+            <Text style={styles.riskTypeText}>Risk Type: </Text>
+            <View style={styles.riskTypeLabel}>
+              <Text style={styles.riskTypeLabelText}>{riskType}</Text>
+            </View>
+          </View>
+
+          {/* Risk Matrix */}
+          <View style={styles.matrixContainer}>
+            {/* Headers */}
+            <View style={styles.matrixHeader}>
+              <View style={styles.probabilityHeader}>
+                <Text style={styles.headerText}>Probability</Text>
+                <Text style={styles.headerSubtext}>Severity →</Text>
+              </View>
+              
+              {/* Consequence Headers */}
+              {consequenceLabels.map((consequence, index) => (
+                <View key={consequence.value} style={styles.consequenceHeader}>
+                  <Text style={styles.consequenceHeaderText}>{consequence.label}</Text>
+                  <Text style={styles.consequenceHeaderSubtext}>{consequence.description}</Text>
+                  <Text style={styles.consequenceScore}>{consequence.score}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Matrix Rows */}
+            {likelihoodLabels.map((likelihood, likelihoodIndex) => (
+              <View key={likelihood.value} style={styles.matrixRow}>
+                {/* Likelihood Header */}
+                <View style={styles.likelihoodHeader}>
+                  <Text style={styles.likelihoodHeaderText}>{likelihood.label}</Text>
+                  <Text style={styles.likelihoodHeaderSubtext}>{likelihood.description}</Text>
+                  <Text style={styles.likelihoodScore}>{likelihood.score}</Text>
+                </View>
+                
+                {/* Matrix Cells */}
+                {consequenceLabels.map((_, consequenceIndex) => 
+                  renderMatrixCell(likelihoodIndex, consequenceIndex)
+                )}
+              </View>
+            ))}
+          </View>
+
+          {/* Risk Legend */}
+          <View style={styles.riskLegend}>
+            {[
+              { label: 'Low Risk (1-2)', color: '#8DC63F' },
+              { label: 'Medium Risk (3-9)', color: '#FFFF00' },
+              { label: 'High Risk (10-15)', color: '#F7941D' },
+              { label: 'Critical Risk (16-25)', color: '#ED1C24' },
+            ].map((item) => (
+              <View key={item.label} style={styles.legendItem}>
+                <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                <Text style={styles.legendText}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Selection Summary */}
+          {selectedCell && (
+            <View style={styles.selectionSummary}>
+              <Text style={styles.selectionTitle}>Selected Risk Assessment:</Text>
+              <Text style={styles.selectionText}>
+                {selectedCell.likelihood.label} and {selectedCell.consequence.label}
+              </Text>
+              <View style={styles.selectionScore}>
+                <Text style={styles.selectionScoreLabel}>Score: </Text>
+                <View style={[styles.scoreBadge, { backgroundColor: getRiskColor(selectedCell.score) }]}>
+                  <Text style={styles.scoreBadgeText}>{selectedCell.score}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.doneButton, !selectedCell && styles.doneButtonDisabled]}
+            onPress={handleDone}
+            disabled={!selectedCell}
+          >
+            <Text style={[styles.doneButtonText, !selectedCell && styles.doneButtonTextDisabled]}>
+              Done
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  container: {
+    width: '85%',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: -2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  supervisorWarning: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+  },
+  supervisorWarningContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  supervisorWarningText: {
+    color: '#92400e',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  riskTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  riskTypeText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  riskTypeLabel: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  riskTypeLabelText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  matrixContainer: {
+    marginBottom: 20,
+  },
+  matrixHeader: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  probabilityHeader: {
+    width: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  headerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  headerSubtext: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  consequenceHeader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    minHeight: 60,
+  },
+  consequenceHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  consequenceHeaderSubtext: {
+    fontSize: 9,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  consequenceScore: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 2,
+  },
+  matrixRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  likelihoodHeader: {
+    width: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    backgroundColor: '#f8fafc',
+  },
+  likelihoodHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  likelihoodHeaderSubtext: {
+    fontSize: 9,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  likelihoodScore: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 2,
+  },
+  matrixCell: {
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 1,
+    borderRadius: 4,
+  },
+  selectedCell: {
+    borderWidth: 3,
+    borderColor: '#1d4ed8',
+  },
+  matrixCellText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  riskLegend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  selectionSummary: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  selectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0c4a6e',
+    marginBottom: 8,
+  },
+  selectionText: {
+    fontSize: 14,
+    color: '#0369a1',
+    marginBottom: 8,
+  },
+  selectionScore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectionScoreLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0369a1',
+  },
+  scoreBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  scoreBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  doneButton: {
+    backgroundColor: '#374151',
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  doneButtonDisabled: {
+    backgroundColor: '#d1d5db',
+  },
+  doneButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  doneButtonTextDisabled: {
+    color: '#9ca3af',
+  },
+});
+
+export default RiskMatrixModal;

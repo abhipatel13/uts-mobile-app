@@ -31,12 +31,7 @@ export const UserApi = {
     return api.put(`/api/users/resetPassword/${id}`, { newPassword });
   },
 
-  // Get current user profile (using restricted endpoint for now)
-  getProfile: async () => {
-    return api.get('/api/users/getAllUserRestricted');
-  },
-
-  // Update current user profile (not available in backend, using edit)
+  // Update user profile (uses edit endpoint)
   updateProfile: async (userId, profileData) => {
     return api.put(`/api/users/editUser/${userId}`, profileData);
   },
