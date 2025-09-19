@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+
+// Conditionally import react-native-maps only for mobile platforms
+let MapView, Marker, PROVIDER_GOOGLE;
+if (Platform.OS !== 'web') {
+  try {
+    const Maps = require('react-native-maps');
+    MapView = Maps.default;
+    Marker = Maps.Marker;
+    PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+  } catch (error) {
+    console.log('react-native-maps not available');
+  }
+}
 
 const { width, height } = Dimensions.get('window');
 
@@ -275,41 +287,99 @@ const TaskHazardMapView = ({
         </View>
       </View>
       
-      {/* Google Maps View */}
+      {/* Map View - Google Maps on Mobile, Stylized on Web */}
       <View style={styles.mapWrapper}>
-        <MapView
-          style={styles.map}
-          region={region}
-          onRegionChangeComplete={setRegion}
-          mapType={mapType === 'satellite' ? 'satellite' : 'standard'}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          showsScale={true}
-          toolbarEnabled={true}
-        >
-          {/* Location Markers */}
-          {locationData.map((location, index) => (
-            <Marker
-              key={index}
-              coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-              }}
-              title={location.location}
-              description={`${location.count} hazard${location.count !== 1 ? 's' : ''} • Risk: ${location.highestRisk}`}
-              onPress={() => handleMarkerPress(location)}
-              pinColor={getRiskColor(location.highestRisk)}
-            >
-              <View style={[
-                styles.customMarker,
-                { backgroundColor: getRiskColor(location.highestRisk) }
-              ]}>
-                <Text style={styles.markerText}>{location.count}</Text>
+        {Platform.OS !== 'web' && MapView ? (
+          // Google Maps for Mobile (iOS/Android)
+          <MapView
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            region={region}
+            onRegionChangeComplete={setRegion}
+            mapType={mapType === 'satellite' ? 'satellite' : 'standard'}
+            showsUserLocation={true}
+            showsMyLocationButton={true}
+            showsCompass={true}
+            showsScale={true}
+            toolbarEnabled={true}
+          >
+            {/* Location Markers */}
+            {locationData.map((location, index) => (
+              <Marker
+                key={index}
+                coordinate={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+                title={location.location}
+                description={`${location.count} hazard${location.count !== 1 ? 's' : ''} • Risk: ${location.highestRisk}`}
+                onPress={() => handleMarkerPress(location)}
+                pinColor={getRiskColor(location.highestRisk)}
+              >
+                <View style={[
+                  styles.customMarker,
+                  { backgroundColor: getRiskColor(location.highestRisk) }
+                ]}>
+                  <Text style={styles.markerText}>{location.count}</Text>
+                </View>
+              </Marker>
+            ))}
+          </MapView>
+        ) : (
+          // Stylized Map for Web
+          <View style={[styles.mapBackground, mapType === 'satellite' && styles.satelliteBackground]}>
+            {/* Map Background Elements */}
+            <View style={styles.mapContent}>
+              {/* Continent shapes for map-like appearance */}
+              <View style={styles.continentContainer}>
+                {/* North America */}
+                <View style={[styles.continent, styles.northAmerica]} />
+                
+                {/* Grid lines for map appearance */}
+                <View style={styles.gridLines}>
+                  {[...Array(8)].map((_, i) => (
+                    <View key={`h-${i}`} style={[styles.gridLine, styles.horizontalLine, { top: `${12.5 * (i + 1)}%` }]} />
+                  ))}
+                  {[...Array(10)].map((_, i) => (
+                    <View key={`v-${i}`} style={[styles.gridLine, styles.verticalLine, { left: `${10 * (i + 1)}%` }]} />
+                  ))}
+                </View>
               </View>
-            </Marker>
-          ))}
-        </MapView>
+
+              {/* Location Markers */}
+              {locationData.map((location, index) => {
+                // Normalize coordinates to map position
+                const normalizedLat = (location.latitude - 25) / 40; // 25-65 range to 0-1
+                const normalizedLng = (location.longitude + 130) / 60; // -130 to -70 range to 0-1
+                
+                const top = Math.max(5, Math.min(85, 15 + (1 - normalizedLat) * 70));
+                const left = Math.max(5, Math.min(90, 5 + normalizedLng * 85));
+
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.locationMarker, { 
+                      top: `${top}%`, 
+                      left: `${left}%` 
+                    }]}
+                    onPress={() => handleMarkerPress(location)}
+                  >
+                    <View style={[
+                      styles.markerDot,
+                      { backgroundColor: getRiskColor(location.highestRisk) }
+                    ]}>
+                      <Text style={styles.markerText}>{location.count}</Text>
+                    </View>
+                    <View style={[
+                      styles.markerPulse,
+                      { borderColor: getRiskColor(location.highestRisk) }
+                    ]} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Legend overlay */}
         <View style={styles.mapLegend}>
@@ -438,6 +508,21 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  customMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   customMarker: {
     width: 32,

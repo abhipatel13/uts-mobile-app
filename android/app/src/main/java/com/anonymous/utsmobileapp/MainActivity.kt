@@ -1,4 +1,4 @@
-package com.utsmobileapp
+package com.anonymous.utsmobileapp
 
 import android.os.Build
 import android.os.Bundle

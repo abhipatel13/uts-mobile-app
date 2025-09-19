@@ -3,7 +3,11 @@
     "name": "uts-mobile-app",
     "slug": "uts-mobile-app",
     "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
@@ -14,8 +18,9 @@
     "ios": {
       "supportsTablet": true,
       "config": {
-        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
-      }
+        "googleMapsApiKey": "AIzaSyA22aR-pavvIbk9Y-D0QgOf1gFkGmgM8rQ"
+      },
+      "bundleIdentifier": "com.anonymous.utsmobileapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,9 +29,10 @@
       },
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+          "apiKey": "AIzaSyA22aR-pavvIbk9Y-D0QgOf1gFkGmgM8rQ"
         }
-      }
+      },
+      "package": "com.anonymous.utsmobileapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
