@@ -39,14 +39,14 @@ export const TaskHazardApi = {
   },
 
   // Get supervisor approvals
-  getAllApprovals: async (params = {}) => {
+  getApprovals: async (params = {}) => {
     const queryParams = new URLSearchParams(params).toString();
     return api.get(`/api/task-hazards/approvals${queryParams ? `?${queryParams}` : ''}`);
   },
 
-  // Supervisor approval action
-  supervisorApproval: async (data) => {
-    return api.post('/api/task-hazards/supervisor-approval', data);
+  // Process approval (approve/reject)
+  processApproval: async (taskHazardId, data) => {
+    return api.put(`/api/task-hazards/${taskHazardId}/approval`, data);
   },
 
   // Get approval history for a task hazard

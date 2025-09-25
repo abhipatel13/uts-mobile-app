@@ -19,6 +19,7 @@ import TaskRisksComponent from './TaskRisksComponent';
 import SimpleMapView from './SimpleMapView';
 import AssetSelector from './AssetSelector';
 import GeoFenceSettings from './GeoFenceSettings';
+import LocationSelector from './LocationSelector';
 import { UserApi } from '../services/UserApi';
 
 const AddTaskHazardModal = ({ 
@@ -431,16 +432,14 @@ const AddTaskHazardModal = ({
       </View>
 
       {/* Location */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Location *</Text>
-        <TextInput
-          style={[styles.input, errors.location && styles.inputError]}
-          value={formData.location}
-          onChangeText={(value) => handleInputChange('location', value)}
-          placeholder="Work location or coordinates"
-        />
-        {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
-      </View>
+      <LocationSelector
+        value={formData.location}
+        onChange={(value) => handleInputChange('location', value)}
+        error={errors.location}
+        label="Location"
+        placeholder="Work location or coordinates"
+        required={true}
+      />
 
       {/* Asset System */}
       <AssetSelector

@@ -4,18 +4,16 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Import react-native-maps with error handling
 let MapView, Marker, PROVIDER_GOOGLE;
-try {
-  const Maps = require('react-native-maps');
-  MapView = Maps.default;
-  Marker = Maps.Marker;
-  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-} catch (error) {
-}
+const Maps = require('react-native-maps');
+MapView = Maps.default;
+Marker = Maps.Marker;
+PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+
 
 const { width, height } = Dimensions.get('window');
 
-const TaskHazardMapView = ({
-  taskHazards = [],
+const RiskAssessmentMapView = ({
+  riskAssessments = [],
   onMarkerPress,
   getRiskColor,
   getStatusColor,
@@ -76,12 +74,12 @@ const TaskHazardMapView = ({
       'washington': { latitude: 38.9072, longitude: -77.0369 },
       'boston': { latitude: 42.3601, longitude: -71.0589 },
       'el paso': { latitude: 31.7619, longitude: -106.4850 },
-      'detroit': { latitude: 42.3314, longitude: -83.0458 },
       'nashville': { latitude: 36.1627, longitude: -86.7816 },
-      'memphis': { latitude: 35.1495, longitude: -90.0490 },
-      'portland': { latitude: 45.5152, longitude: -122.6784 },
+      'detroit': { latitude: 42.3314, longitude: -83.0458 },
       'oklahoma city': { latitude: 35.4676, longitude: -97.5164 },
+      'portland': { latitude: 45.5152, longitude: -122.6784 },
       'las vegas': { latitude: 36.1699, longitude: -115.1398 },
+      'memphis': { latitude: 35.1495, longitude: -90.0490 },
       'louisville': { latitude: 38.2527, longitude: -85.7585 },
       'baltimore': { latitude: 39.2904, longitude: -76.6122 },
       'milwaukee': { latitude: 43.0389, longitude: -87.9065 },
@@ -100,7 +98,7 @@ const TaskHazardMapView = ({
       'omaha': { latitude: 41.2565, longitude: -95.9345 },
       'oakland': { latitude: 37.8044, longitude: -122.2712 },
       'minneapolis': { latitude: 44.9778, longitude: -93.2650 },
-      'tulsa': { latitude: 36.1539, longitude: -95.9928 },
+      'tulsa': { latitude: 36.1540, longitude: -95.9928 },
       'arlington': { latitude: 32.7357, longitude: -97.1081 },
       'tampa': { latitude: 27.9506, longitude: -82.4572 },
       'new orleans': { latitude: 29.9511, longitude: -90.0715 },
@@ -115,12 +113,106 @@ const TaskHazardMapView = ({
       'riverside': { latitude: 33.9533, longitude: -117.3962 },
       'lexington': { latitude: 38.0406, longitude: -84.5037 },
       'stockton': { latitude: 37.9577, longitude: -121.2908 },
-      'henderson': { latitude: 36.0397, longitude: -114.9817 },
-      'saint paul': { latitude: 44.9537, longitude: -93.0900 },
-      'st. louis': { latitude: 38.6270, longitude: -90.1994 },
-      'cincinnati': { latitude: 39.1031, longitude: -84.5120 },
-      'pittsburgh': { latitude: 40.4406, longitude: -79.9959 },
-      // International locations
+      'toledo': { latitude: 41.6528, longitude: -83.5379 },
+      'st. paul': { latitude: 44.9537, longitude: -93.0900 },
+      'newark': { latitude: 40.7357, longitude: -74.1724 },
+      'greensboro': { latitude: 36.0726, longitude: -79.7920 },
+      'plano': { latitude: 33.0198, longitude: -96.6989 },
+      'henderson': { latitude: 36.0395, longitude: -114.9817 },
+      'lincoln': { latitude: 40.8136, longitude: -96.7026 },
+      'buffalo': { latitude: 42.8864, longitude: -78.8784 },
+      'jersey city': { latitude: 40.7178, longitude: -74.0431 },
+      'chula vista': { latitude: 32.6401, longitude: -117.0842 },
+      'fort wayne': { latitude: 41.0793, longitude: -85.1394 },
+      'orlando': { latitude: 28.5383, longitude: -81.3792 },
+      'st. petersburg': { latitude: 27.7676, longitude: -82.6403 },
+      'chandler': { latitude: 33.3062, longitude: -111.8412 },
+      'laredo': { latitude: 27.5306, longitude: -99.4803 },
+      'norfolk': { latitude: 36.8468, longitude: -76.2852 },
+      'durham': { latitude: 35.9940, longitude: -78.8986 },
+      'madison': { latitude: 43.0731, longitude: -89.4012 },
+      'lubbock': { latitude: 33.5779, longitude: -101.8552 },
+      'irvine': { latitude: 33.6846, longitude: -117.8265 },
+      'winston salem': { latitude: 36.0999, longitude: -80.2442 },
+      'glendale': { latitude: 33.5387, longitude: -112.1860 },
+      'garland': { latitude: 32.9126, longitude: -96.6389 },
+      'hialeah': { latitude: 25.8576, longitude: -80.2781 },
+      'reno': { latitude: 39.5296, longitude: -119.8138 },
+      'chesapeake': { latitude: 36.7682, longitude: -76.2875 },
+      'gilbert': { latitude: 33.3528, longitude: -111.7890 },
+      'baton rouge': { latitude: 30.4515, longitude: -91.1871 },
+      'irving': { latitude: 32.8140, longitude: -96.9489 },
+      'scottsdale': { latitude: 33.4942, longitude: -111.9211 },
+      'north las vegas': { latitude: 36.1989, longitude: -115.1175 },
+      'fremont': { latitude: 37.5483, longitude: -121.9886 },
+      'boise': { latitude: 43.6150, longitude: -116.2023 },
+      'richmond': { latitude: 37.5407, longitude: -77.4360 },
+      'san bernardino': { latitude: 34.1083, longitude: -117.2898 },
+      'birmingham': { latitude: 33.5207, longitude: -86.8025 },
+      'spokane': { latitude: 47.6588, longitude: -117.4260 },
+      'rochester': { latitude: 43.1566, longitude: -77.6088 },
+      'des moines': { latitude: 41.5868, longitude: -93.6250 },
+      'modesto': { latitude: 37.6391, longitude: -120.9969 },
+      'fayetteville': { latitude: 35.0527, longitude: -78.8784 },
+      'tacoma': { latitude: 47.2529, longitude: -122.4443 },
+      'oxnard': { latitude: 34.1975, longitude: -119.1771 },
+      'fontana': { latitude: 34.0922, longitude: -117.4350 },
+      'columbus': { latitude: 32.4610, longitude: -84.9877 },
+      'montgomery': { latitude: 32.3668, longitude: -86.3000 },
+      'moreno valley': { latitude: 33.9425, longitude: -117.2297 },
+      'shreveport': { latitude: 32.5252, longitude: -93.7502 },
+      'aurora': { latitude: 39.7294, longitude: -104.8319 },
+      'yonkers': { latitude: 40.9312, longitude: -73.8987 },
+      'akron': { latitude: 41.0814, longitude: -81.5190 },
+      'huntington beach': { latitude: 33.6595, longitude: -117.9988 },
+      'glendale': { latitude: 34.1425, longitude: -118.2551 },
+      'salt lake city': { latitude: 40.7608, longitude: -111.8910 },
+      'little rock': { latitude: 34.7465, longitude: -92.2896 },
+      'amarillo': { latitude: 35.2220, longitude: -101.8313 },
+      'grand rapids': { latitude: 42.9634, longitude: -85.6681 },
+      'mobile': { latitude: 30.6954, longitude: -88.0399 },
+      'knoxville': { latitude: 35.9606, longitude: -83.9207 },
+      'worcester': { latitude: 42.2626, longitude: -71.8023 },
+      'newport news': { latitude: 37.0871, longitude: -76.4730 },
+      'brownsville': { latitude: 25.9018, longitude: -97.4975 },
+      'overland park': { latitude: 38.9822, longitude: -94.6708 },
+      'santa clarita': { latitude: 34.3917, longitude: -118.5426 },
+      'providence': { latitude: 41.8240, longitude: -71.4128 },
+      'garden grove': { latitude: 33.7739, longitude: -117.9414 },
+      'chattanooga': { latitude: 35.0456, longitude: -85.3097 },
+      'oceanside': { latitude: 33.1959, longitude: -117.3795 },
+      'jackson': { latitude: 32.2988, longitude: -90.1848 },
+      'fort lauderdale': { latitude: 26.1224, longitude: -80.1373 },
+      'santa rosa': { latitude: 38.4404, longitude: -122.7141 },
+      'rancho cucamonga': { latitude: 34.1064, longitude: -117.5931 },
+      'port st. lucie': { latitude: 27.2730, longitude: -80.3582 },
+      'tempe': { latitude: 33.4255, longitude: -111.9400 },
+      'ontario': { latitude: 34.0633, longitude: -117.6509 },
+      'vancouver': { latitude: 45.6387, longitude: -122.6615 },
+      'sioux falls': { latitude: 43.5446, longitude: -96.7311 },
+      'springfield': { latitude: 37.2083, longitude: -93.2923 },
+      'peoria': { latitude: 33.5806, longitude: -112.2374 },
+      'pembroke pines': { latitude: 26.0078, longitude: -80.2963 },
+      'elk grove': { latitude: 38.4088, longitude: -121.3716 },
+      'salem': { latitude: 44.9429, longitude: -123.0351 },
+      'lancaster': { latitude: 34.6868, longitude: -118.1542 },
+      'corona': { latitude: 33.8753, longitude: -117.5664 },
+      'eugene': { latitude: 44.0521, longitude: -123.0868 },
+      'palmdale': { latitude: 34.5794, longitude: -118.1165 },
+      'salinas': { latitude: 36.6777, longitude: -121.6555 },
+      'springfield': { latitude: 42.1015, longitude: -72.5898 },
+      'pasadena': { latitude: 34.1478, longitude: -118.1445 },
+      'fort collins': { latitude: 40.5853, longitude: -105.0844 },
+      'hayward': { latitude: 37.6688, longitude: -122.0808 },
+      'pomona': { latitude: 34.0553, longitude: -117.7503 },
+      'cary': { latitude: 35.7915, longitude: -78.7811 },
+      'rockford': { latitude: 42.2711, longitude: -89.0940 },
+      'alexandria': { latitude: 38.8048, longitude: -77.0469 },
+      'escondido': { latitude: 33.1192, longitude: -117.0864 },
+      'mckinney': { latitude: 33.1972, longitude: -96.6397 },
+      'kansas city': { latitude: 39.0997, longitude: -94.5786 },
+      'joliet': { latitude: 41.5250, longitude: -88.0817 },
+      'sunnyvale': { latitude: 37.3688, longitude: -122.0363 },
       'toronto': { latitude: 43.6532, longitude: -79.3832 },
       'vancouver': { latitude: 49.2827, longitude: -123.1207 },
       'montreal': { latitude: 45.5017, longitude: -73.5673 },
@@ -136,41 +228,41 @@ const TaskHazardMapView = ({
     };
   };
 
-  // Process task hazards to create location data - memoized to prevent unnecessary recalculations
+  // Process risk assessments to create location data - memoized to prevent unnecessary recalculations
   const locationData = useMemo(() => {
     const locationMap = new Map();
     
-    taskHazards.forEach(hazard => {
-      if (!hazard.location) return;
+    riskAssessments.forEach(assessment => {
+      if (!assessment.location) return;
       
       // Create a unique key for each location
-      const locationKey = hazard.location.toLowerCase().trim();
+      const locationKey = assessment.location.toLowerCase().trim();
       
       if (locationMap.has(locationKey)) {
         // Add to existing location
         const existing = locationMap.get(locationKey);
-        existing.hazards.push(hazard);
+        existing.assessments.push(assessment);
         existing.count++;
         // Update highest risk score
-        const hazardRisk = calculateHighestRiskScore(hazard.risks);
-        if (hazardRisk > existing.highestRisk) {
-          existing.highestRisk = hazardRisk;
+        const assessmentRisk = calculateHighestRiskScore(assessment.risks);
+        if (assessmentRisk > existing.highestRisk) {
+          existing.highestRisk = assessmentRisk;
         }
       } else {
         // Create new location entry
         locationMap.set(locationKey, {
-          location: hazard.location,
-          latitude: parseLocationCoordinates(hazard.location).latitude,
-          longitude: parseLocationCoordinates(hazard.location).longitude,
+          location: assessment.location,
+          latitude: parseLocationCoordinates(assessment.location).latitude,
+          longitude: parseLocationCoordinates(assessment.location).longitude,
           count: 1,
-          hazards: [hazard],
-          highestRisk: calculateHighestRiskScore(hazard.risks)
+          assessments: [assessment],
+          highestRisk: calculateHighestRiskScore(assessment.risks)
         });
       }
     });
     
     return Array.from(locationMap.values());
-  }, [taskHazards]);
+  }, [riskAssessments]);
 
   // Function to fit map to show all markers
   const fitMapToMarkers = useCallback((locations) => {
@@ -210,15 +302,15 @@ const TaskHazardMapView = ({
   }, []);
 
   const handleMarkerPress = useCallback((locationData) => {
-    const hazardsList = locationData.hazards.map(h => 
-      `• ${h.scopeOfWork} (${h.status})`
+    const assessmentsList = locationData.assessments.map(a => 
+      `• ${a.scopeOfWork} (${a.status})`
     ).join('\n');
     
     Alert.alert(
       `Location: ${locationData.location}`,
-      `Task Hazards: ${locationData.count}\nHighest Risk Score: ${locationData.highestRisk}\n\nHazards:\n${hazardsList}`,
+      `Risk Assessments: ${locationData.count}\nHighest Risk Score: ${locationData.highestRisk}\n\nAssessments:\n${assessmentsList}`,
       [
-        { text: 'View Details', onPress: () => onMarkerPress && onMarkerPress(locationData.hazards[0]) },
+        { text: 'View Details', onPress: () => onMarkerPress && onMarkerPress(locationData.assessments[0]) },
         { text: 'OK' }
       ]
     );
@@ -229,7 +321,7 @@ const TaskHazardMapView = ({
     if (locationData.length > 0 && mapReady) {
       fitMapToMarkers(locationData);
     }
-  }, [taskHazards, mapReady, fitMapToMarkers]);
+  }, [riskAssessments, mapReady, fitMapToMarkers]);
 
   // Also fit to markers when locationData changes, even if map isn't ready yet
   useEffect(() => {
@@ -281,7 +373,7 @@ const TaskHazardMapView = ({
     return (
       <View style={styles.mapContainer}>
         <View style={styles.mapHeader}>
-          <Text style={styles.mapTitle}>Task Hazard Locations</Text>
+          <Text style={styles.mapTitle}>Risk Assessment Locations</Text>
         </View>
         <View style={[styles.mapPlaceholder, styles.mapLoading]}>
           <Ionicons name="map-outline" size={48} color="#94a3b8" />
@@ -294,7 +386,6 @@ const TaskHazardMapView = ({
   return (
     <View style={styles.mapContainer}>
       <View style={styles.mapHeader}>
-        <Text style={styles.mapTitle}>Task Hazard Locations</Text>
         <View style={styles.mapControls}>
           <TouchableOpacity 
             style={[styles.mapButton, mapType === 'standard' && styles.activeMapButton]}
@@ -394,7 +485,7 @@ const TaskHazardMapView = ({
                   longitude: location.longitude,
                 }}
                 title={location.location}
-                description={`${location.count} hazard${location.count !== 1 ? 's' : ''} • Risk: ${location.highestRisk}`}
+                description={`${location.count} assessment${location.count !== 1 ? 's' : ''} • Risk: ${location.highestRisk}`}
                 onPress={() => handleMarkerPress(location)}
                 pinColor={getRiskColor(location.highestRisk)}
               >
@@ -451,95 +542,31 @@ const TaskHazardMapView = ({
               {/* Location Markers */}
               {locationData.map((location, index) => {
                 // Normalize coordinates to map position
-                const normalizedLat = (location.latitude - 25) / 40; // 25-65 range to 0-1
-                const normalizedLng = (location.longitude + 130) / 60; // -130 to -70 range to 0-1
+                const normalizedLat = (location.latitude - 25) / 40; // 25° to 65° N
+                const normalizedLng = (location.longitude + 130) / 60; // -130° to -70° W
                 
-                const top = Math.max(5, Math.min(85, 15 + (1 - normalizedLat) * 70));
-                const left = Math.max(5, Math.min(90, 5 + normalizedLng * 85));
-
+                const markerX = Math.max(0, Math.min(1, normalizedLng)) * width;
+                const markerY = Math.max(0, Math.min(1, 1 - normalizedLat)) * 300;
+                
                 return (
                   <TouchableOpacity
                     key={index}
-                    style={[styles.locationMarker, { 
-                      top: `${top}%`, 
-                      left: `${left}%` 
-                    }]}
+                    style={[
+                      styles.fallbackMarker,
+                      { 
+                        left: markerX - 15, 
+                        top: markerY - 15,
+                        backgroundColor: getRiskColor(location.highestRisk)
+                      }
+                    ]}
                     onPress={() => handleMarkerPress(location)}
                   >
-                    <View style={[
-                      styles.markerDot,
-                      { backgroundColor: getRiskColor(location.highestRisk) }
-                    ]}>
-                      <Text style={styles.markerText}>{location.count}</Text>
-                    </View>
-                    <View style={[
-                      styles.markerPulse,
-                      { borderColor: getRiskColor(location.highestRisk) }
-                    ]} />
+                    <Text style={styles.fallbackMarkerText}>{location.count}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
           </View>
-        )}
-
-        {/* Legend overlay */}
-        <View style={styles.mapLegend}>
-          <Text style={styles.legendTitle}>Risk Levels</Text>
-          <View style={styles.legendItems}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} />
-              <Text style={styles.legendText}>Low (1-4)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.legendText}>Medium (5-9)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
-              <Text style={styles.legendText}>High (10-16)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#991b1b' }]} />
-              <Text style={styles.legendText}>Critical (17+)</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Map info overlay */}
-        <View style={styles.mapInfo}>
-          <Text style={styles.mapInfoText}>
-            {locationData.length} locations • {taskHazards.length} task hazards
-          </Text>
-        </View>
-
-        {/* Location List */}
-        {locationData.length > 0 && (
-          <ScrollView style={styles.locationsList} showsVerticalScrollIndicator={false}>
-            <Text style={styles.locationsTitle}>Locations ({locationData.length})</Text>
-            {locationData.map((location, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.locationItem}
-                onPress={() => handleMarkerPress(location)}
-              >
-                <View style={styles.locationInfo}>
-                  <Text style={styles.locationName} numberOfLines={1}>
-                    {location.location}
-                  </Text>
-                  <Text style={styles.locationDetails}>
-                    {location.count} hazard{location.count !== 1 ? 's' : ''} • Risk: {location.highestRisk}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.locationRiskBadge,
-                  { backgroundColor: getRiskColor(location.highestRisk) }
-                ]}>
-                  <Text style={styles.locationRiskText}>{location.highestRisk}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         )}
       </View>
     </View>
@@ -550,11 +577,12 @@ const styles = StyleSheet.create({
   mapContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-    marginHorizontal: 20,
-    marginVertical: 10,
+    margin: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   mapHeader: {
     flexDirection: 'row',
@@ -562,12 +590,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#e5e7eb',
   },
   mapTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#111827',
   },
   mapControls: {
     flexDirection: 'row',
@@ -603,37 +631,83 @@ const styles = StyleSheet.create({
   },
   mapActionButton: {
     padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f3f4f6',
   },
   mapWrapper: {
-    height: 400,
+    height: 300,
     position: 'relative',
   },
   map: {
     flex: 1,
   },
-  customMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3b82f6',
+  mapPlaceholder: {
+    height: 300,
+    backgroundColor: '#f9fafb',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+  },
+  mapLoading: {
+    backgroundColor: '#f3f4f6',
+  },
+  mapLoadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  mapBackground: {
+    flex: 1,
+    backgroundColor: '#e5f3ff',
+    position: 'relative',
+  },
+  satelliteBackground: {
+    backgroundColor: '#2d5016',
+  },
+  mapContent: {
+    flex: 1,
+    position: 'relative',
+  },
+  continentContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  continent: {
+    position: 'absolute',
+    backgroundColor: '#d1d5db',
+    borderRadius: 20,
+  },
+  northAmerica: {
+    width: '60%',
+    height: '40%',
+    top: '20%',
+    left: '10%',
+  },
+  gridLines: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  gridLine: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  horizontalLine: {
+    width: '100%',
+    height: 1,
+  },
+  verticalLine: {
+    height: '100%',
+    width: 1,
   },
   customMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#3b82f6',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -646,123 +720,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  mapPlaceholder: {
-    height: 400,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapLoading: {
-    backgroundColor: '#f8fafc',
-  },
-  mapLoadingText: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 12,
-  },
-  mapLegend: {
+  fallbackMarker: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 12,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  legendTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  legendItems: {
-    gap: 4,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    fontSize: 10,
-    color: '#64748b',
-  },
-  mapInfo: {
-    position: 'absolute',
-    bottom: 8,
-    left: 10,
-    right: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  mapInfoText: {
-    color: '#fff',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  locationsList: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 200,
-    maxHeight: 300,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 8,
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  locationsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 4,
-    backgroundColor: 'rgba(248, 250, 252, 0.8)',
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationName: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  locationDetails: {
-    fontSize: 9,
-    color: '#64748b',
-  },
-  locationRiskBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  locationRiskText: {
+  fallbackMarkerText: {
     color: '#fff',
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   mapErrorOverlay: {
@@ -804,12 +779,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 100,
   },
-  mapLoadingText: {
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 8,
-  },
 });
 
-export default TaskHazardMapView;
+export default RiskAssessmentMapView;

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { RiskAssessmentApi } from '../services';
 import AddRiskAssessmentModal from '../components/AddRiskAssessmentModal';
+import RiskAssessmentDetailsModal from '../components/RiskAssessmentDetailsModal';
 
 const RiskAssessmentScreen = () => {
   const [riskAssessments, setRiskAssessments] = useState([]);
@@ -20,6 +21,9 @@ const RiskAssessmentScreen = () => {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreatingRiskAssessment, setIsCreatingRiskAssessment] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [selectedRiskAssessment, setSelectedRiskAssessment] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Load risk assessments on component mount
   useEffect(() => {
@@ -67,6 +71,8 @@ const RiskAssessmentScreen = () => {
   const handleCreateRiskAssessment = async (riskAssessmentData) => {
     try {
       setIsCreatingRiskAssessment(true);
+
+      console.log('riskAssessmentData', riskAssessmentData);
       
       await RiskAssessmentApi.create(riskAssessmentData);
       
@@ -205,29 +211,13 @@ const RiskAssessmentScreen = () => {
   };
 
   const handleRiskAssessmentInfo = (riskAssessment) => {
-    const highestRisk = calculateHighestRiskScore(riskAssessment.risks);
-    const riskCount = riskAssessment.risks?.length || 0;
-    const individualCount = riskAssessment.individuals ? riskAssessment.individuals.split(',').length : 0;
-    
-    const detailsText = [
-      `ID: ${riskAssessment.id}`,
-      `Scope: ${riskAssessment.scopeOfWork}`,
-      `Date/Time: ${riskAssessment.date} ${riskAssessment.time}`,
-      `Location: ${riskAssessment.location}`,
-      `Status: ${riskAssessment.status}`,
-      `Supervisor: ${riskAssessment.supervisor || 'N/A'}`,
-      `Individuals: ${individualCount}`,
-      `Risks: ${riskCount}`,
-      `Highest Risk Score: ${highestRisk}`,
-      `Asset System: ${riskAssessment.assetSystem || 'N/A'}`,
-      `Created: ${new Date(riskAssessment.createdAt).toLocaleDateString() || 'N/A'}`
-    ].join('\n');
+    setSelectedRiskAssessment(riskAssessment);
+    setShowDetailsModal(true);
+  };
 
-    Alert.alert(
-      'Risk Assessment Details',
-      detailsText,
-      [{ text: 'OK' }]
-    );
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedRiskAssessment(null);
   };
 
   const renderEmptyState = () => (
@@ -266,16 +256,41 @@ const RiskAssessmentScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header with Add Risk Assessment Button */}
+      {/* Header with View Toggle and Add Button */}
       <View style={styles.header}>
-        <Text style={styles.title}>Risk Assessment Dashboard</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add Assessment</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* View Toggle */}
+          <View style={styles.viewToggle}>
+            <TouchableOpacity 
+              style={[styles.toggleButton, viewMode === 'list' && styles.activeToggleButton]}
+              onPress={() => setViewMode('list')}
+            >
+              <Ionicons 
+                name="list-outline" 
+                size={18} 
+                color={viewMode === 'list' ? '#fff' : '#64748b'} 
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleButton, viewMode === 'map' && styles.activeToggleButton]}
+              onPress={() => setViewMode('map')}
+            >
+              <Ionicons 
+                name="map-outline" 
+                size={18} 
+                color={viewMode === 'map' ? '#fff' : '#64748b'} 
+              />
+            </TouchableOpacity>
+          </View>
+                    
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>Add Assessment</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Risk Assessments List */}
@@ -306,6 +321,15 @@ const RiskAssessmentScreen = () => {
         onSubmit={handleCreateRiskAssessment}
         isLoading={isCreatingRiskAssessment}
       />
+
+      {/* Risk Assessment Details Modal */}
+      <RiskAssessmentDetailsModal
+        visible={showDetailsModal}
+        onClose={closeDetailsModal}
+        riskAssessment={selectedRiskAssessment}
+        getRiskColor={getRiskColor}
+        getStatusColor={getStatusColor}
+      />
     </View>
   );
 };
@@ -316,18 +340,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+    padding: 2,
+  },
+  toggleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  activeToggleButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
   },
   title: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
+    flex: 1,
+    textAlign: 'center',
   },
   addButton: {
     flexDirection: 'row',

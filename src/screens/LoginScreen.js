@@ -101,8 +101,21 @@ export default function LoginScreen({ navigation }) {
         isAuthenticated: true,
       }));
       await AsyncStorage.setItem('authToken', token);
-
-      // Navigation will be handled automatically by auth state change in App.js
+      
+      console.log('Login successful, user data stored');
+      console.log('Auth state will be automatically detected by App.js polling');
+      
+      // Try to trigger immediate auth refresh, but don't worry if it fails
+      // The polling mechanism will catch it within 1 second
+      setTimeout(() => {
+        try {
+          const { triggerAuthRefresh } = require('../../App');
+          triggerAuthRefresh();
+          console.log('Auth refresh triggered successfully');
+        } catch (importError) {
+          console.log('Using polling fallback for auth state detection');
+        }
+      }, 100);
 
     } catch (error) {
       console.error('Login error:', error);

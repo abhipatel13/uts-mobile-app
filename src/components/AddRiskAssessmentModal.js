@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -9,10 +9,16 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ActionSheetIOS,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import TaskRisksComponent from './TaskRisksComponent';
+import AssetSelector from './AssetSelector';
+import LocationSelector from './LocationSelector';
+import { UserApi } from '../services/UserApi';
 
 const AddRiskAssessmentModal = ({ 
   visible, 
@@ -25,8 +31,8 @@ const AddRiskAssessmentModal = ({
     time: '',
     scopeOfWork: '',
     assetSystem: '',
-    supervisor: '',
-    individuals: '',
+    assessmentTeam: [],
+    lead: '',
     location: '',
     status: 'Pending',
     risks: []
@@ -34,7 +40,33 @@ const AddRiskAssessmentModal = ({
 
   const [errors, setErrors] = useState({});
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 4;
+  const [users, setUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+
+  // Fetch users from API
+  const fetchUsers = async () => {
+    try {
+      setIsLoadingUsers(true);
+      const response = await UserApi.getAll(); // This calls getAllUserRestricted
+      if (response && response.data) {
+        setUsers(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      
+      // Check if it's an authentication error
+      if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
+        // Don't show alert for auth errors - global logout will handle navigation
+        console.log('Authentication expired, user will be redirected to login');
+      } else {
+        Alert.alert('Error', 'Failed to load users. Please try again.');
+      }
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -51,6 +83,9 @@ const AddRiskAssessmentModal = ({
         date: dateString,
         time: timeString
       }));
+      
+      // Fetch users when modal opens
+      fetchUsers();
     }
   }, [visible]);
 
@@ -60,8 +95,8 @@ const AddRiskAssessmentModal = ({
       time: '',
       scopeOfWork: '',
       assetSystem: '',
-      supervisor: '',
-      individuals: '',
+      assessmentTeam: [],
+      lead: '',
       location: '',
       status: 'Pending',
       risks: []
@@ -70,20 +105,23 @@ const AddRiskAssessmentModal = ({
     setCurrentStep(1);
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
     
     // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: null
-      }));
-    }
-  };
+    setErrors(prev => {
+      if (prev[field]) {
+        return {
+          ...prev,
+          [field]: null
+        };
+      }
+      return prev;
+    });
+  }, []);
 
   const validateStep = (step) => {
     const newErrors = {};
@@ -102,22 +140,16 @@ const AddRiskAssessmentModal = ({
       if (!formData.location.trim()) {
         newErrors.location = 'Location is required';
       }
+      if (!formData.assetSystem.trim()) {
+        newErrors.assetSystem = 'Asset system is required';
+      }
     } else if (step === 2) {
       // Personnel validation
-      if (!formData.supervisor.trim()) {
-        newErrors.supervisor = 'Supervisor email is required';
-      } else if (!isValidEmail(formData.supervisor.trim())) {
-        newErrors.supervisor = 'Please enter a valid supervisor email';
+      if (!formData.lead.trim()) {
+        newErrors.lead = 'Assessment Lead is required';
       }
-      if (!formData.individuals.trim()) {
-        newErrors.individuals = 'At least one individual email is required';
-      } else {
-        // Validate individual emails (comma-separated)
-        const emails = formData.individuals.split(',').map(email => email.trim());
-        const invalidEmails = emails.filter(email => !isValidEmail(email));
-        if (invalidEmails.length > 0) {
-          newErrors.individuals = `Invalid email(s): ${invalidEmails.join(', ')}`;
-        }
+      if (formData.assessmentTeam.length === 0) {
+        newErrors.assessmentTeam = 'Assessment Team is required';
       }
     } else if (step === 3) {
       // Risk Assessment validation
@@ -175,25 +207,36 @@ const AddRiskAssessmentModal = ({
       date: formData.date,
       time: formData.time,
       scopeOfWork: formData.scopeOfWork.trim(),
-      assetSystem: formData.assetSystem.trim() || null,
-      supervisor: formData.supervisor.trim(),
-      individuals: formData.individuals.trim(),
+      assetSystem: formData.assetSystem.trim(),
+      supervisor: formData.lead.trim(),
+      individuals: formData.assessmentTeam.join(', '),
       location: formData.location.trim(),
       status: formData.status,
       risks: formData.risks
     };
 
+    console.log('riskAssessmentData', riskAssessmentToCreate);
+
     try {
       await onSubmit(riskAssessmentToCreate);
       onClose();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to create risk assessment');
+      console.error('Error creating risk assessment:', error);
+      
+      // Check if it's an authentication error
+      if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
+        // Don't show alert for auth errors - global logout will handle navigation
+        console.log('Authentication expired, user will be redirected to login');
+        onClose(); // Close modal since user will be logged out
+      } else {
+        Alert.alert('Error', error.message || 'Failed to create risk assessment');
+      }
     }
   };
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
-      {[1, 2, 3].map((step) => (
+      {[1, 2, 3, 4].map((step) => (
         <View key={step} style={styles.stepItem}>
           <View style={[
             styles.stepCircle, 
@@ -208,7 +251,7 @@ const AddRiskAssessmentModal = ({
             </Text>
           </View>
           <Text style={[styles.stepLabel, currentStep === step && styles.stepLabelActive]}>
-            {step === 1 ? 'Basic Info' : step === 2 ? 'Personnel' : 'Risks'}
+            {step === 1 ? 'Basic Info' : step === 2 ? 'Team' : step === 3 ? 'Risks' : 'Status'}
           </Text>
         </View>
       ))}
@@ -256,25 +299,26 @@ const AddRiskAssessmentModal = ({
       </View>
 
       {/* Location */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Location *</Text>
-        <TextInput
-          style={[styles.input, errors.location && styles.inputError]}
-          value={formData.location}
-          onChangeText={(value) => handleInputChange('location', value)}
-          placeholder="Assessment location or coordinates"
-        />
-        {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
-      </View>
+      <LocationSelector
+        value={formData.location}
+        onChange={(value) => handleInputChange('location', value)}
+        error={errors.location}
+        label="Location"
+        placeholder="Assessment location or coordinates"
+        required={true}
+      />
 
       {/* Asset System */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Asset System</Text>
-        <TextInput
-          style={styles.input}
+        <Text style={styles.label}>Asset</Text>
+        <Text style={styles.helpText}>
+          Select or search for the asset related to this risk assessment
+        </Text>
+        <AssetSelector
           value={formData.assetSystem}
-          onChangeText={(value) => handleInputChange('assetSystem', value)}
-          placeholder="Related asset or system ID"
+          onValueChange={(assetId) => handleInputChange('assetSystem', assetId)}
+          error={errors.assetSystem}
+          placeholder="Search and select asset..."
         />
       </View>
     </ScrollView>
@@ -282,54 +326,67 @@ const AddRiskAssessmentModal = ({
 
   const renderPersonnel = () => (
     <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
-      {/* Supervisor */}
+      {/* Assessment Lead */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Supervisor Email *</Text>
-        <TextInput
-          style={[styles.input, errors.supervisor && styles.inputError]}
-          value={formData.supervisor}
-          onChangeText={(value) => handleInputChange('supervisor', value)}
-          placeholder="supervisor@company.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        {errors.supervisor && <Text style={styles.errorText}>{errors.supervisor}</Text>}
-      </View>
-
-      {/* Individuals */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Individual Emails *</Text>
-        <TextInput
-          style={[styles.input, styles.textArea, errors.individuals && styles.inputError]}
-          value={formData.individuals}
-          onChangeText={(value) => handleInputChange('individuals', value)}
-          placeholder="user1@company.com, user2@company.com"
-          multiline
-          numberOfLines={3}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+        <Text style={styles.label}>Assessment Lead *</Text>
         <Text style={styles.helpText}>
-          Enter multiple emails separated by commas
+          Select the person responsible for leading this risk assessment
         </Text>
-        {errors.individuals && <Text style={styles.errorText}>{errors.individuals}</Text>}
+        {Platform.OS === 'ios' ? (
+          <TouchableOpacity
+            style={[styles.iosPickerButton, errors.lead && styles.inputError]}
+            onPress={() => showUserPicker('lead')}
+          >
+            <Text style={[styles.iosPickerText, !formData.lead && styles.placeholderText]}>
+              {formData.lead || 'Select Assessment Lead'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.pickerContainer, errors.lead && styles.inputError]}>
+            <Picker
+              selectedValue={formData.lead || ""}
+              onValueChange={(value) => handleInputChange('lead', value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select Assessment Lead" value="" />
+              {users.map((user) => (
+                <Picker.Item key={user.id} label={`${user.name} (${user.email})`} value={user.email} />
+              ))}
+            </Picker>
+          </View>
+        )}
+        {errors.lead && <Text style={styles.errorText}>{errors.lead}</Text>}
       </View>
 
-      {/* Status */}
+      {/* Assessment Team */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Status</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.status}
-            onValueChange={(value) => handleInputChange('status', value)}
-            style={styles.picker}
+        <Text style={styles.label}>Assessment Team *</Text>
+        <Text style={styles.helpText}>
+          Select multiple team members for this risk assessment
+        </Text>
+        {Platform.OS === 'ios' ? (
+          <TouchableOpacity
+            style={[styles.iosPickerButton, errors.assessmentTeam && styles.inputError]}
+            onPress={() => showTeamPicker()}
           >
-            <Picker.Item label="Pending" value="Pending" />
-            <Picker.Item label="Active" value="Active" />
-            <Picker.Item label="Inactive" value="Inactive" />
-            <Picker.Item label="Completed" value="Completed" />
-          </Picker>
-        </View>
+            <Text style={[styles.iosPickerText, formData.assessmentTeam.length === 0 && styles.placeholderText]}>
+              {getTeamDisplayText()}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.iosPickerButton, errors.assessmentTeam && styles.inputError]}
+            onPress={() => showTeamPicker()}
+          >
+            <Text style={[styles.iosPickerText, formData.assessmentTeam.length === 0 && styles.placeholderText]}>
+              {getTeamDisplayText()}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
+        )}
+        {errors.assessmentTeam && <Text style={styles.errorText}>{errors.assessmentTeam}</Text>}
       </View>
     </ScrollView>
   );
@@ -346,6 +403,192 @@ const AddRiskAssessmentModal = ({
     </View>
   );
 
+  const renderRiskStatus = () => (
+    <ScrollView 
+      style={styles.stepContent} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContentContainer}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Status */}
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>Risk Status</Text>
+        <Text style={styles.helpText}>
+          Select the current status of this risk assessment
+        </Text>
+        {Platform.OS === 'ios' ? (
+          <TouchableOpacity
+            style={styles.iosPickerButton}
+            onPress={showStatusPicker}
+          >
+            <Text style={styles.iosPickerText}>
+              {formData.status}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#6b7280" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.status || "Pending"}
+              onValueChange={(value) => handleInputChange('status', value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Pending" value="Pending" />
+              <Picker.Item label="Active" value="Active" />
+              <Picker.Item label="Inactive" value="Inactive" />
+            </Picker>
+          </View>
+        )}
+        {errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
+      </View>
+
+    </ScrollView>
+  );
+
+  // Helper functions
+  const showUserPicker = (field) => {
+    const userOptions = ['Cancel', ...users.map(user => `${user.name} (${user.email})`)];
+    const cancelButtonIndex = 0;
+
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: userOptions,
+        cancelButtonIndex,
+      },
+      (buttonIndex) => {
+        if (buttonIndex !== cancelButtonIndex) {
+          const selectedUser = users[buttonIndex - 1];
+          handleInputChange(field, selectedUser.email);
+        }
+      }
+    );
+  };
+
+  // Show team picker for multiple selection
+  const showTeamPicker = () => {
+    if (users.length === 0) {
+      Alert.alert('No Users', 'No users available for selection.');
+      return;
+    }
+
+    // Create a simple alert with options to select/deselect users
+    const currentTeam = formData.assessmentTeam;
+    const userOptions = users.map(user => {
+      const isSelected = currentTeam.includes(user.email);
+      return `${isSelected ? '✓' : '○'} ${user.name} (${user.email})`;
+    });
+    
+    const options = ['Done', ...userOptions];
+    
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: 0,
+          title: 'Select Assessment Team Members',
+          message: 'Tap to toggle selection',
+        },
+        (buttonIndex) => {
+          if (buttonIndex > 0) {
+            const selectedUser = users[buttonIndex - 1];
+            toggleTeamMember(selectedUser.email);
+            // Show the picker again for multiple selections
+            setTimeout(() => showTeamPicker(), 100);
+          }
+        }
+      );
+    } else {
+      // For Android, show a simple alert with the current selection
+      Alert.alert(
+        'Select Assessment Team',
+        'Current selection: ' + getTeamDisplayText(),
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Modify Selection', onPress: () => showAndroidTeamSelector() }
+        ]
+      );
+    }
+  };
+
+  // Android team selector (simplified)
+  const showAndroidTeamSelector = () => {
+    const currentTeam = formData.assessmentTeam;
+    const userButtons = users.map((user, index) => {
+      const isSelected = currentTeam.includes(user.email);
+      return {
+        text: `${isSelected ? '✓' : '○'} ${user.name}`,
+        onPress: () => {
+          toggleTeamMember(user.email);
+          setTimeout(() => showAndroidTeamSelector(), 100);
+        }
+      };
+    });
+
+    Alert.alert(
+      'Select Team Members',
+      'Tap to toggle selection',
+      [
+        ...userButtons,
+        { text: 'Done', style: 'default' }
+      ]
+    );
+  };
+
+  // Toggle team member selection
+  const toggleTeamMember = (userEmail) => {
+    const currentTeam = formData.assessmentTeam;
+    const isSelected = currentTeam.includes(userEmail);
+    
+    let newTeam;
+    if (isSelected) {
+      // Remove user from team
+      newTeam = currentTeam.filter(email => email !== userEmail);
+    } else {
+      // Add user to team
+      newTeam = [...currentTeam, userEmail];
+    }
+    
+    handleInputChange('assessmentTeam', newTeam);
+  };
+
+  // Get display text for selected team members
+  const getTeamDisplayText = () => {
+    if (formData.assessmentTeam.length === 0) {
+      return 'Select Assessment Team';
+    }
+    
+    const selectedUsers = users.filter(user => 
+      formData.assessmentTeam.includes(user.email)
+    );
+    
+    if (selectedUsers.length === 1) {
+      return `${selectedUsers[0].name}`;
+    } else if (selectedUsers.length <= 2) {
+      return selectedUsers.map(user => user.name).join(', ');
+    } else {
+      return `${selectedUsers[0].name} +${selectedUsers.length - 1} others`;
+    }
+  };
+
+  const showStatusPicker = () => {
+    const options = ['Cancel', 'Pending', 'Active', 'Inactive'];
+    const cancelButtonIndex = 0;
+
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex,
+      },
+      (buttonIndex) => {
+        if (buttonIndex !== cancelButtonIndex) {
+          const selectedStatus = options[buttonIndex];
+          handleInputChange('status', selectedStatus);
+        }
+      }
+    );
+  };
+
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -354,19 +597,26 @@ const AddRiskAssessmentModal = ({
         return renderPersonnel();
       case 3:
         return renderRiskAssessment();
+      case 4:
+        return renderRiskStatus();
       default:
         return renderBasicInformation();
     }
   };
 
   return (
+    <>
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Add Risk Assessment</Text>
@@ -417,8 +667,10 @@ const AddRiskAssessmentModal = ({
             )}
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
+
+    </>
   );
 };
 
@@ -606,6 +858,27 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  iosPickerButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iosPickerText: {
+    fontSize: 16,
+    color: '#374151',
+  },
+  scrollContentContainer: {
+    paddingBottom: 20,
+  },
+  placeholderText: {
+    color: '#9ca3af',
   },
 });
 

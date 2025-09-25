@@ -82,9 +82,28 @@ export async function apiClient(endpoint, options = {}) {
     // Handle HTTP errors
     if (!response.ok) {
       // Handle authentication errors
-      if (data?.code === 'INVALID_TOKEN' || data?.code === 'TOKEN_EXPIRED') {
+      const isAuthError = 
+        data?.code === 'INVALID_TOKEN' || 
+        data?.code === 'TOKEN_EXPIRED' ||
+        response.status === 401 ||
+        (data?.message && data.message.toLowerCase().includes('authentication expired')) ||
+        (data?.message && data.message.toLowerCase().includes('token expired')) ||
+        (data?.message && data.message.toLowerCase().includes('login again'));
+        
+      if (isAuthError) {
+        console.log('Authentication error detected, triggering logout...');
+        
         // Clear auth data and navigate to login
         await AsyncStorage.multiRemove(['user', 'authToken']);
+        
+        // Trigger global logout to update app state
+        try {
+          const { triggerGlobalLogout } = require('../../App');
+          triggerGlobalLogout();
+        } catch (importError) {
+          console.warn('Could not trigger global logout:', importError);
+        }
+        
         throw new ApiError(
           'Authentication expired. Please login again.',
           401,

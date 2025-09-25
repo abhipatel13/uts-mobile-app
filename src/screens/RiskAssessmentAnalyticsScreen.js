@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RiskAssessmentApi } from '../services';
-import SimpleMapView from '../components/SimpleMapView';
+import RiskAssessmentMapView from '../components/RiskAssessmentMapView';
+import RiskAssessmentDetailsModal from '../components/RiskAssessmentDetailsModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,13 +31,8 @@ const RiskAssessmentAnalyticsScreen = () => {
     byRiskLevel: {},
     locationData: []
   });
-  const [mapType, setMapType] = useState('standard');
-  const [region, setRegion] = useState({
-    latitude: 45.4215, // Center of North America
-    longitude: -75.6919,
-    latitudeDelta: 60,
-    longitudeDelta: 60,
-  });
+  const [selectedRiskAssessment, setSelectedRiskAssessment] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const statusOptions = ['All', 'Active', 'Inactive', 'Pending', 'Completed'];
 
@@ -102,15 +98,11 @@ const RiskAssessmentAnalyticsScreen = () => {
             riskScore: Math.max(existing.riskScore, highestRisk)
           });
         } else {
-          // Generate realistic coordinates based on location string
-          const coords = generateCoordinatesFromLocation(assessment.location);
           locationMap.set(key, {
             location: assessment.location,
             count: 1,
             riskScore: highestRisk,
-            id: assessment.id,
-            latitude: coords.latitude,
-            longitude: coords.longitude
+            id: assessment.id
           });
         }
       }
@@ -138,51 +130,17 @@ const RiskAssessmentAnalyticsScreen = () => {
     return '#991b1b'; // dark red - critical
   };
 
-  // Generate realistic coordinates based on location string
-  const generateCoordinatesFromLocation = (location) => {
-    // Common locations with approximate coordinates
-    const locationCoords = {
-      'toronto': { latitude: 43.6532, longitude: -79.3832 },
-      'montreal': { latitude: 45.5017, longitude: -73.5673 },
-      'vancouver': { latitude: 49.2827, longitude: -123.1207 },
-      'calgary': { latitude: 51.0447, longitude: -114.0719 },
-      'edmonton': { latitude: 53.5461, longitude: -113.4938 },
-      'ottawa': { latitude: 45.4215, longitude: -75.6919 },
-      'winnipeg': { latitude: 49.8951, longitude: -97.1384 },
-      'quebec city': { latitude: 46.8139, longitude: -71.2080 },
-      'halifax': { latitude: 44.6488, longitude: -63.5752 },
-      'new york': { latitude: 40.7128, longitude: -74.0060 },
-      'los angeles': { latitude: 34.0522, longitude: -118.2437 },
-      'chicago': { latitude: 41.8781, longitude: -87.6298 },
-      'houston': { latitude: 29.7604, longitude: -95.3698 },
-      'phoenix': { latitude: 33.4484, longitude: -112.0740 },
-      'philadelphia': { latitude: 39.9526, longitude: -75.1652 },
-      'san antonio': { latitude: 29.4241, longitude: -98.4936 },
-      'san diego': { latitude: 32.7157, longitude: -117.1611 },
-      'dallas': { latitude: 32.7767, longitude: -96.7970 },
-      'san jose': { latitude: 37.3382, longitude: -121.8863 },
-      'austin': { latitude: 30.2672, longitude: -97.7431 }
-    };
-
-    const locationKey = location.toLowerCase();
-    
-    // Check if we have predefined coordinates
-    if (locationCoords[locationKey]) {
-      return locationCoords[locationKey];
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'active': return '#22c55e'; // green
+      case 'completed': return '#3b82f6'; // blue
+      case 'pending': return '#f59e0b'; // orange
+      case 'inactive': return '#6b7280'; // gray
+      case 'rejected': return '#ef4444'; // red
+      default: return '#6b7280'; // gray
     }
-
-    // Generate pseudo-random coordinates based on location string hash
-    const hash = location.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-
-    // Generate coordinates within North America bounds
-    const latitude = 25 + (Math.abs(hash) % 40); // 25° to 65° N
-    const longitude = -130 + (Math.abs(hash >> 8) % 60); // -130° to -70° W
-
-    return { latitude, longitude };
   };
+
 
   const showLocationDetails = (location) => {
     Alert.alert(
@@ -190,6 +148,16 @@ const RiskAssessmentAnalyticsScreen = () => {
       `Location: ${location.location}\nRisk Assessments: ${location.count}\nHighest Risk Score: ${location.riskScore}`,
       [{ text: 'OK' }]
     );
+  };
+
+  const showRiskAssessmentDetails = (riskAssessment) => {
+    setSelectedRiskAssessment(riskAssessment);
+    setShowDetailsModal(true);
+  };
+
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedRiskAssessment(null);
   };
 
   const renderStatusDropdown = () => {
@@ -218,153 +186,9 @@ const RiskAssessmentAnalyticsScreen = () => {
     );
   };
 
-  const renderMapPlaceholder = () => {
-    return (
-      <View style={styles.mapContainer}>
-        <View style={styles.mapHeader}>
-          <Text style={styles.mapTitle}>Location Map</Text>
-          <View style={styles.mapControls}>
-            <TouchableOpacity style={[styles.mapButton, styles.activeMapButton]}>
-              <Text style={styles.activeMapButtonText}>Map</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.mapButton}>
-              <Text style={styles.mapButtonText}>Satellite</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={styles.fullscreenButton}>
-            <Ionicons name="expand-outline" size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Enhanced Map with Real Data */}
-        <View style={styles.mapPlaceholder}>
-          <View style={styles.mapBackground}>
-            {/* World map base - realistic continent shapes */}
-            <View style={styles.worldMapBase}>
-              {/* North America - More realistic shape */}
-              <View style={[styles.northAmerica, {
-                top: '18%', left: '12%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* Greenland */}
-              <View style={[styles.greenland, {
-                top: '8%', left: '28%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* South America - Narrower, elongated */}
-              <View style={[styles.southAmerica, {
-                top: '45%', left: '22%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* Europe - Small, irregular */}
-              <View style={[styles.europe, {
-                top: '20%', left: '42%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* Africa - Distinctive shape */}
-              <View style={[styles.africa, {
-                top: '28%', left: '44%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* Asia - Large, complex */}
-              <View style={[styles.asia, {
-                top: '12%', left: '52%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* Australia - Small island */}
-              <View style={[styles.australia, {
-                top: '62%', left: '72%',
-                backgroundColor: 'rgba(156, 163, 175, 0.4)',
-              }]} />
-              
-              {/* Antarctica - Bottom strip */}
-              <View style={[styles.antarctica, {
-                top: '85%', left: '15%',
-                backgroundColor: 'rgba(156, 163, 175, 0.3)',
-              }]} />
-            </View>
-            
-            {/* Dynamic Location Markers based on real data */}
-            {analytics.locationData.map((location, index) => {
-              // Generate pseudo-coordinates based on location string hash
-              const hash = location.location.split('').reduce((a, b) => {
-                a = ((a << 5) - a) + b.charCodeAt(0);
-                return a & a;
-              }, 0);
-              
-              const top = 20 + (Math.abs(hash) % 60); // 20% to 80%
-              const left = 15 + (Math.abs(hash >> 8) % 70); // 15% to 85%
-              
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.locationMarker, { 
-                    top: `${top}%`, 
-                    left: `${left}%` 
-                  }]}
-                  onPress={() => showLocationDetails(location)}
-                >
-                  <View style={[
-                    styles.markerDot,
-                    { backgroundColor: getRiskColor(location.riskScore) }
-                  ]}>
-                    <Text style={styles.markerText}>{location.count}</Text>
-                  </View>
-                  <View style={[
-                    styles.markerPulse,
-                    { borderColor: getRiskColor(location.riskScore) }
-                  ]} />
-                </TouchableOpacity>
-              );
-            })}
-            
-            {/* Legend */}
-            <View style={styles.mapLegend}>
-              <Text style={styles.legendTitle}>Risk Levels</Text>
-              <View style={styles.legendItems}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} />
-                  <Text style={styles.legendText}>Low (1-4)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-                  <Text style={styles.legendText}>Medium (5-9)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
-                  <Text style={styles.legendText}>High (10-16)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#991b1b' }]} />
-                  <Text style={styles.legendText}>Critical (17+)</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-          
-          {/* Map attribution */}
-          <View style={styles.mapAttribution}>
-            <TouchableOpacity style={styles.attributionButton}>
-              <Ionicons name="location-outline" size={16} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Risk Assessment Analytics</Text>
-      </View>
 
       {/* Search and Filter Controls */}
       <View style={styles.controlsContainer}>
@@ -399,21 +223,18 @@ const RiskAssessmentAnalyticsScreen = () => {
 
       {/* Map Section */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <SimpleMapView
-          locationData={analytics.locationData}
-          region={region}
-          mapType={mapType}
-          onRegionChange={setRegion}
-          onMapTypeChange={setMapType}
-          onMarkerPress={showLocationDetails}
+        <RiskAssessmentMapView
+          riskAssessments={riskAssessments}
+          onMarkerPress={showRiskAssessmentDetails}
           getRiskColor={getRiskColor}
+          getStatusColor={getStatusColor}
           isLoading={isLoading}
         />
         
         {/* Real-time Analytics Cards */}
         <View style={styles.analyticsCards}>
           <View style={styles.analyticsCard}>
-            <Ionicons name="shield-checkmark-outline" size={24} color="rgb(52, 73, 94)" />
+            <Ionicons name="document-text-outline" size={24} color="rgb(52, 73, 94)" />
             <Text style={styles.cardTitle}>Total Assessments</Text>
             <Text style={styles.cardValue}>{analytics.total}</Text>
             <Text style={styles.cardSubtext}>
@@ -422,27 +243,27 @@ const RiskAssessmentAnalyticsScreen = () => {
           </View>
           
           <View style={styles.analyticsCard}>
-            <Ionicons name="alert-circle-outline" size={24} color="#991b1b" />
-            <Text style={styles.cardTitle}>Critical Risk</Text>
-            <Text style={[styles.cardValue, { color: '#991b1b' }]}>{analytics.criticalRisk}</Text>
-            <Text style={styles.cardSubtext}>Need immediate action</Text>
+            <Ionicons name="warning-outline" size={24} color="#ef4444" />
+            <Text style={styles.cardTitle}>High Risk</Text>
+            <Text style={[styles.cardValue, { color: '#ef4444' }]}>{analytics.criticalRisk}</Text>
+            <Text style={styles.cardSubtext}>Require attention</Text>
           </View>
           
           <View style={styles.analyticsCard}>
-            <Ionicons name="map-outline" size={24} color="#3b82f6" />
+            <Ionicons name="location-outline" size={24} color="#3b82f6" />
             <Text style={styles.cardTitle}>Locations</Text>
             <Text style={[styles.cardValue, { color: '#3b82f6' }]}>{analytics.locations}</Text>
-            <Text style={styles.cardSubtext}>Assessment sites</Text>
+            <Text style={styles.cardSubtext}>Different sites</Text>
           </View>
         </View>
 
         {/* Risk Distribution Chart */}
         <View style={styles.chartContainer}>
-          <Text style={styles.chartTitle}>Risk Assessment Distribution</Text>
+          <Text style={styles.chartTitle}>Risk Distribution</Text>
           <View style={styles.riskDistribution}>
             <View style={styles.riskBar}>
               <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>Low Risk</Text>
+                <Text style={styles.riskBarLabel}>Low</Text>
                 <Text style={styles.riskBarValue}>{analytics.byRiskLevel.low || 0}</Text>
               </View>
               <View style={styles.riskBarContainer}>
@@ -458,7 +279,7 @@ const RiskAssessmentAnalyticsScreen = () => {
 
             <View style={styles.riskBar}>
               <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>Medium Risk</Text>
+                <Text style={styles.riskBarLabel}>Medium</Text>
                 <Text style={styles.riskBarValue}>{analytics.byRiskLevel.medium || 0}</Text>
               </View>
               <View style={styles.riskBarContainer}>
@@ -474,7 +295,7 @@ const RiskAssessmentAnalyticsScreen = () => {
 
             <View style={styles.riskBar}>
               <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>High Risk</Text>
+                <Text style={styles.riskBarLabel}>High</Text>
                 <Text style={styles.riskBarValue}>{analytics.byRiskLevel.high || 0}</Text>
               </View>
               <View style={styles.riskBarContainer}>
@@ -490,7 +311,7 @@ const RiskAssessmentAnalyticsScreen = () => {
 
             <View style={styles.riskBar}>
               <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>Critical Risk</Text>
+                <Text style={styles.riskBarLabel}>Critical</Text>
                 <Text style={styles.riskBarValue}>{analytics.byRiskLevel.critical || 0}</Text>
               </View>
               <View style={styles.riskBarContainer}>
@@ -508,7 +329,7 @@ const RiskAssessmentAnalyticsScreen = () => {
 
         {/* Status Overview */}
         <View style={styles.statusContainer}>
-          <Text style={styles.statusTitle}>Assessment Status Overview</Text>
+          <Text style={styles.statusTitle}>Status Overview</Text>
           <View style={styles.statusGrid}>
             {Object.entries(analytics.byStatus).map(([status, count]) => (
               <View key={status} style={styles.statusItem}>
@@ -519,6 +340,15 @@ const RiskAssessmentAnalyticsScreen = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Risk Assessment Details Modal */}
+      <RiskAssessmentDetailsModal
+        visible={showDetailsModal}
+        onClose={closeDetailsModal}
+        riskAssessment={selectedRiskAssessment}
+        getRiskColor={getRiskColor}
+        getStatusColor={getStatusColor}
+      />
     </View>
   );
 };
@@ -623,82 +453,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  mapContainer: {
-    margin: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-  },
-  mapHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  mapControls: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 6,
-    padding: 2,
-  },
-  mapButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  activeMapButton: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  mapButtonText: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  activeMapButtonText: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '500',
-  },
-  fullscreenButton: {
-    padding: 8,
-  },
-  mapPlaceholder: {
-    height: 300,
-    position: 'relative',
-  },
-  mapBackground: {
-    flex: 1,
-    backgroundColor: '#7dd3fc',
-    position: 'relative',
-  },
-  mapRegion: {
-    position: 'absolute',
-    borderRadius: 8,
-    opacity: 0.7,
-  },
-  mapAttribution: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-  },
-  attributionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 8,
-    borderRadius: 6,
   },
   analyticsCards: {
     flexDirection: 'row',

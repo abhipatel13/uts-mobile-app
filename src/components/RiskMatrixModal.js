@@ -8,6 +8,7 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -95,6 +96,7 @@ const RiskMatrixModal = ({
     return riskMatrix[likelihoodIndex][consequenceIndex];
   };
 
+
   const getRiskColor = (score) => {
     if (score <= 2) return '#8DC63F'; // Low Risk - Green
     if (score <= 9) return '#FFFF00'; // Medium Risk - Yellow
@@ -140,6 +142,7 @@ const RiskMatrixModal = ({
         const likelihood = likelihoodLabels[likelihoodIndex];
         const consequence = consequenceLabels[consequenceIndex];
         const score = getRiskScore(likelihoodIndex, consequenceIndex);
+        
         setSelectedCell({ 
           likelihood, 
           consequence, 
@@ -181,12 +184,7 @@ const RiskMatrixModal = ({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={styles.modalBackdrop} 
-          activeOpacity={1} 
-          onPress={onClose}
-        />
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>
@@ -299,8 +297,8 @@ const RiskMatrixModal = ({
             </Text>
           </TouchableOpacity>
         </View>
+        </SafeAreaView>
       </View>
-    </View>
     </Modal>
   );
 };
@@ -308,24 +306,14 @@ const RiskMatrixModal = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   container: {
-    width: '85%',
+    flex: 1,
     backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: -2,
-      height: 0,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   header: {
     flexDirection: 'row',
@@ -480,7 +468,7 @@ const styles = StyleSheet.create({
   matrixCellText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#000000',
   },
   riskLegend: {
     flexDirection: 'row',

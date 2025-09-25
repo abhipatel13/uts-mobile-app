@@ -11,11 +11,9 @@ import {
   ActionSheetIOS,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import RiskMatrixModal from './RiskMatrixModal';
 
 const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
-  console.log('TaskRisksComponent rendered with enhanced risk matrix functionality');
   const [expandedRisks, setExpandedRisks] = useState(new Set());
   const [showAsIsMatrix, setShowAsIsMatrix] = useState(false);
   const [showMitigatedMatrix, setShowMitigatedMatrix] = useState(false);
@@ -26,10 +24,12 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
     riskType: 'Personnel',
     asIsLikelihood: 'Very Unlikely',
     asIsConsequence: 'Minor',
+    asIsScore: 1, // Default score for Very Unlikely + Minor
     mitigatingAction: '',
     mitigatingActionType: 'Elimination',
     mitigatedLikelihood: 'Very Unlikely',
     mitigatedConsequence: 'Minor',
+    mitigatedScore: 1, // Default score for Very Unlikely + Minor
     requiresSupervisorSignature: false,
   };
 
@@ -165,19 +165,30 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
 
   // Handle risk matrix selection for as-is risk
   const handleAsIsRiskSelection = (likelihood, consequence, score) => {
-    updateRisk(activeRiskIndex, 'asIsLikelihood', likelihood);
-    updateRisk(activeRiskIndex, 'asIsConsequence', consequence);
+    // Update all fields in a single operation to avoid state conflicts
+    const newRisks = [...risks];
+    newRisks[activeRiskIndex] = { 
+      ...newRisks[activeRiskIndex], 
+      asIsLikelihood: likelihood,
+      asIsConsequence: consequence,
+      asIsScore: score
+    };
+    onRisksChange(newRisks);
   };
 
   // Handle risk matrix selection for mitigated risk
   const handleMitigatedRiskSelection = (likelihood, consequence, score) => {
-    updateRisk(activeRiskIndex, 'mitigatedLikelihood', likelihood);
-    updateRisk(activeRiskIndex, 'mitigatedConsequence', consequence);
-    
-    // Auto-enable supervisor signature for high risk scores
-    if (score > 9) {
-      updateRisk(activeRiskIndex, 'requiresSupervisorSignature', true);
-    }
+    // Update all fields in a single operation to avoid state conflicts
+    const newRisks = [...risks];
+    newRisks[activeRiskIndex] = { 
+      ...newRisks[activeRiskIndex], 
+      mitigatedLikelihood: likelihood,
+      mitigatedConsequence: consequence,
+      mitigatedScore: score,
+      // Auto-enable supervisor signature for high risk scores
+      requiresSupervisorSignature: score > 9 ? true : newRisks[activeRiskIndex].requiresSupervisorSignature
+    };
+    onRisksChange(newRisks);
   };
 
   // Cross-platform picker handlers
@@ -347,8 +358,9 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
 
   const renderRiskItem = (risk, index) => {
     const isExpanded = expandedRisks.has(index);
-    const asIsScore = calculateRiskScore(risk.asIsLikelihood, risk.asIsConsequence, risk.riskType);
-    const mitigatedScore = calculateRiskScore(risk.mitigatedLikelihood, risk.mitigatedConsequence, risk.riskType);
+    // Use stored scores if available, otherwise calculate them
+    const asIsScore = risk.asIsScore || calculateRiskScore(risk.asIsLikelihood, risk.asIsConsequence, risk.riskType);
+    const mitigatedScore = risk.mitigatedScore || calculateRiskScore(risk.mitigatedLikelihood, risk.mitigatedConsequence, risk.riskType);
     const consequenceLabels = getConsequenceLabels(risk.riskType);
 
     return (
@@ -427,18 +439,16 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
                   disabled={!risk.riskType}
                 >
                   {risk.riskType && asIsScore > 0 ? (
-                    <View style={styles.associatedRisksSelected}>
-                      <View style={[styles.riskScoreBadge, { backgroundColor: getRiskScoreColor(asIsScore, risk.riskType) }]}>
-                        <Text style={styles.riskScoreText}>Score {asIsScore}</Text>
-                      </View>
+                    <View style={[styles.associatedRisksSelected, { backgroundColor: getRiskScoreColor(asIsScore, risk.riskType) }]}>
                       <View style={styles.associatedRisksInfo}>
                         <Text style={styles.associatedRisksTitle}>
                           {risk.asIsLikelihood} and {risk.asIsConsequence}
                         </Text>
-                        <Text style={styles.associatedRisksSubtitle}>
-                          {getRiskScoreLabel(asIsScore, risk.riskType)}
-                        </Text>
                       </View>
+                      <View style={styles.riskScoreBadge}>
+                        <Text style={styles.riskScoreText}>Score {asIsScore}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#000000" style={styles.chevronIcon} />
                     </View>
                   ) : risk.riskType ? (
                     <View style={styles.associatedRisksPlaceholder}>
@@ -448,6 +458,7 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
                       <Text style={styles.associatedRisksSubtext}>
                         Open risk matrix to assess {risk.riskType} risks
                       </Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6b7280" style={styles.chevronIcon} />
                     </View>
                   ) : (
                     <View style={styles.associatedRisksPlaceholder}>
@@ -457,10 +468,8 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
                       <Text style={styles.associatedRisksSubtext}>
                         Please select a risk type before assessing risks
                       </Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6b7280" style={styles.chevronIcon} />
                     </View>
-                  )}
-                  {risk.riskType && (
-                    <Ionicons name="chevron-forward" size={16} color="#6b7280" style={styles.chevronIcon} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -518,18 +527,16 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
                           </Text>
                         </View>
                       )}
-                      <View style={styles.postMitigationInfo}>
-                        <View style={[styles.riskScoreBadge, { backgroundColor: getRiskScoreColor(mitigatedScore, risk.riskType) }]}>
-                          <Text style={styles.riskScoreText}>Score {mitigatedScore}</Text>
-                        </View>
+                      <View style={[styles.postMitigationInfo, { backgroundColor: getRiskScoreColor(mitigatedScore, risk.riskType) }]}>
                         <View style={styles.mitigatedRiskDetails}>
                           <Text style={styles.mitigatedRiskTitle}>
                             {risk.mitigatedLikelihood} and {risk.mitigatedConsequence}
                           </Text>
-                          <Text style={styles.mitigatedRiskSubtitle}>
-                            {getRiskScoreLabel(mitigatedScore, risk.riskType)}
-                          </Text>
                         </View>
+                        <View style={styles.riskScoreBadge}>
+                          <Text style={styles.riskScoreText}>Score {mitigatedScore}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#000000" style={styles.chevronIcon} />
                       </View>
                     </View>
                   ) : risk.mitigatingActionType ? (
@@ -540,6 +547,7 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
                       <Text style={styles.postMitigationSubtext}>
                         Open risk matrix to assess risks after mitigation
                       </Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6b7280" style={styles.chevronIcon} />
                     </View>
                   ) : (
                     <View style={styles.postMitigationPlaceholder}>
@@ -549,10 +557,8 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
                       <Text style={styles.postMitigationSubtext}>
                         Please select a mitigating action type before assessing post-mitigation risks
                       </Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6b7280" style={styles.chevronIcon} />
                     </View>
-                  )}
-                  {risk.mitigatingActionType && (
-                    <Ionicons name="chevron-forward" size={16} color="#6b7280" style={styles.chevronIcon} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -708,7 +714,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   riskScoreText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -839,26 +845,31 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#fff',
     minHeight: 80,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   associatedRisksSelected: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    minHeight: 80,
   },
   associatedRisksInfo: {
-    marginLeft: 8,
+    flex: 1,
+    marginRight: 8,
   },
   associatedRisksTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#000000',
+    flexWrap: 'wrap',
   },
   associatedRisksSubtitle: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#000000',
     marginTop: 2,
+    opacity: 0.8,
+    flexWrap: 'wrap',
   },
   chevronIcon: {
     marginLeft: 8,
@@ -886,10 +897,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#fff',
     minHeight: 120,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    overflow: 'hidden',
   },
   postMitigationSelected: {
     flex: 1,
@@ -912,19 +920,25 @@ const styles = StyleSheet.create({
   postMitigationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    minHeight: 80,
   },
   mitigatedRiskDetails: {
-    marginLeft: 8,
+    flex: 1,
+    marginRight: 8,
   },
   mitigatedRiskTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#000000',
+    flexWrap: 'wrap',
   },
   mitigatedRiskSubtitle: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#000000',
     marginTop: 2,
+    opacity: 0.8,
+    flexWrap: 'wrap',
   },
   postMitigationPlaceholder: {
     flex: 1,

@@ -11,7 +11,7 @@ import {
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/AuthService';
-import { triggerGlobalLogout } from '../../App';
+import { triggerGlobalLogout } from '../utils/globalHandlers';
 
 const menuItems = [
   {

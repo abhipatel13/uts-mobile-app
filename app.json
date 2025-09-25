@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "uts-mobile-app",
+    "name": "UTS Mobile App",
     "slug": "uts-mobile-app",
     "version": "1.0.0",
     "platforms": [
@@ -11,16 +11,18 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#34495e"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "config": {
         "googleMapsApiKey": "AIzaSyA22aR-pavvIbk9Y-D0QgOf1gFkGmgM8rQ"
       },
-      "bundleIdentifier": "com.anonymous.utsmobileapp"
+      "bundleIdentifier": "com.utahtech.utsmobileapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,10 +34,17 @@
           "apiKey": "AIzaSyA22aR-pavvIbk9Y-D0QgOf1gFkGmgM8rQ"
         }
       },
-      "package": "com.anonymous.utsmobileapp"
+      "package": "com.utahtech.utsmobileapp",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "96f1f544-38c2-44c7-88a1-823dbbeeb79c"
+      }
+    },
+    "owner": "abhipatel8675"
   }
 }

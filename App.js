@@ -6,6 +6,7 @@ import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from './src/services/AuthService';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
+import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
 // Create navigation reference
 const navigationRef = createRef();
@@ -21,6 +22,7 @@ import RiskAssessmentScreen from './src/screens/RiskAssessmentScreen';
 import TaskHazardAnalyticsScreen from './src/screens/TaskHazardAnalyticsScreen';
 import RiskAssessmentAnalyticsScreen from './src/screens/RiskAssessmentAnalyticsScreen';
 import UserManagementScreen from './src/screens/UserManagementScreen';
+import ApprovalRequestsScreen from './src/screens/ApprovalRequestsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -173,6 +175,13 @@ function MainAppNavigator() {
           title: 'User Management',
         }}
       />
+      <Stack.Screen 
+        name="ApprovalRequests" 
+        component={ApprovalRequestsScreen}
+        options={{
+          title: 'Approval Requests',
+        }}
+      />
     </Stack.Navigator>
 
     {/* Custom Sidebar Modal */}
@@ -186,18 +195,7 @@ function MainAppNavigator() {
   );
 }
 
-// Global function to handle logout
-let globalLogoutHandler = null;
-
-export const setGlobalLogoutHandler = (handler) => {
-  globalLogoutHandler = handler;
-};
-
-export const triggerGlobalLogout = () => {
-  if (globalLogoutHandler) {
-    globalLogoutHandler();
-  }
-};
+// Global functions are now handled in src/utils/globalHandlers.js
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -210,11 +208,28 @@ export default function App() {
     setGlobalLogoutHandler(() => {
       setIsAuthenticated(false);
     });
-  }, []);
+    
+    // Set global auth refresh handler
+    setGlobalAuthRefreshHandler(() => {
+      console.log('Global auth refresh handler called');
+      checkAuthStatus();
+    });
+    
+    // Poll for auth status changes (as backup)
+    const authCheckInterval = setInterval(() => {
+      if (!isAuthenticated) {
+        checkAuthStatus();
+      }
+    }, 1000);
+    
+    return () => clearInterval(authCheckInterval);
+  }, [isAuthenticated]);
 
   const checkAuthStatus = async () => {
     try {
+      console.log('Checking authentication status...');
       const authenticated = await AuthService.isAuthenticated();
+      console.log('Authentication status:', authenticated);
       setIsAuthenticated(authenticated);
     } catch (error) {
       console.error('Error checking auth status:', error);

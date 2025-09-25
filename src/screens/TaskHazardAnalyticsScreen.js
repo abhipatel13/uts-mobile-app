@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardApi } from '../services';
-import SimpleMapView from '../components/SimpleMapView';
+import TaskHazardMapView from '../components/TaskHazardMapView';
+import TaskHazardDetailsModal from '../components/TaskHazardDetailsModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,6 +38,8 @@ const TaskHazardAnalyticsScreen = () => {
     latitudeDelta: 60,
     longitudeDelta: 60,
   });
+  const [selectedTaskHazard, setSelectedTaskHazard] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const statusOptions = ['All', 'Active', 'Inactive', 'Pending', 'Completed', 'Rejected'];
 
@@ -54,7 +57,9 @@ const TaskHazardAnalyticsScreen = () => {
     try {
       setIsLoading(true);
       const response = await TaskHazardApi.getAll();
+      console.log('API Response:', response);
       const data = response.data || [];
+      console.log('Task Hazards data from API:', data);
       setTaskHazards(data);
     } catch (error) {
       console.error('Error fetching task hazards:', error);
@@ -65,9 +70,14 @@ const TaskHazardAnalyticsScreen = () => {
   };
 
   const calculateAnalytics = () => {
+    console.log('TaskHazards data:', taskHazards);
+    console.log('Selected status:', selectedStatus);
+    
     const filteredData = selectedStatus === 'All' 
       ? taskHazards 
       : taskHazards.filter(th => th.status === selectedStatus);
+    
+    console.log('Filtered data:', filteredData);
 
     const statusCounts = {};
     const riskCounts = { low: 0, medium: 0, high: 0, critical: 0 };
@@ -164,6 +174,17 @@ const TaskHazardAnalyticsScreen = () => {
     return '#991b1b'; // dark red - critical
   };
 
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'active': return '#22c55e'; // green
+      case 'inactive': return '#6b7280'; // gray
+      case 'pending': return '#f59e0b'; // orange
+      case 'completed': return '#3b82f6'; // blue
+      case 'rejected': return '#ef4444'; // red
+      default: return '#6b7280'; // gray
+    }
+  };
+
   // Generate realistic coordinates based on location string
   const generateCoordinatesFromLocation = (location) => {
     // Common locations with approximate coordinates
@@ -228,7 +249,6 @@ const TaskHazardAnalyticsScreen = () => {
     return (
       <View style={styles.mapContainer}>
         <View style={styles.mapHeader}>
-          <Text style={styles.mapTitle}>Task Hazard Locations</Text>
           <View style={styles.mapControls}>
             <TouchableOpacity style={[styles.mapButton, styles.activeMapButton]}>
               <Text style={styles.activeMapButtonText}>Risk View</Text>
@@ -314,7 +334,15 @@ const TaskHazardAnalyticsScreen = () => {
                     top: `${top}%`, 
                     left: `${left}%` 
                   }]}
-                  onPress={() => showLocationDetails(location)}
+                  onPress={() => {
+                    // Find the first task hazard at this location to show details
+                    const hazardAtLocation = taskHazards.find(th => th.location === location.location);
+                    if (hazardAtLocation) {
+                      showTaskHazardDetails(hazardAtLocation);
+                    } else {
+                      showLocationDetails(location);
+                    }
+                  }}
                 >
                   <View style={[
                     styles.markerDot,
@@ -373,12 +401,18 @@ const TaskHazardAnalyticsScreen = () => {
     );
   };
 
+  const showTaskHazardDetails = (taskHazard) => {
+    setSelectedTaskHazard(taskHazard);
+    setShowDetailsModal(true);
+  };
+
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedTaskHazard(null);
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Task Hazard Analytics</Text>
-      </View>
 
       {/* Search and Filter Controls */}
       <View style={styles.controlsContainer}>
@@ -413,14 +447,11 @@ const TaskHazardAnalyticsScreen = () => {
 
       {/* Map Section */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <SimpleMapView
-          locationData={analytics.locationData}
-          region={region}
-          mapType={mapType}
-          onRegionChange={setRegion}
-          onMapTypeChange={setMapType}
-          onMarkerPress={showLocationDetails}
+        <TaskHazardMapView
+          taskHazards={taskHazards}
+          onMarkerPress={showTaskHazardDetails}
           getRiskColor={getRiskColor}
+          getStatusColor={getStatusColor}
           isLoading={isLoading}
         />
         
@@ -533,6 +564,15 @@ const TaskHazardAnalyticsScreen = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Task Hazard Details Modal */}
+      <TaskHazardDetailsModal
+        visible={showDetailsModal}
+        onClose={closeDetailsModal}
+        taskHazard={selectedTaskHazard}
+        getRiskColor={getRiskColor}
+        getStatusColor={getStatusColor}
+      />
     </View>
   );
 };

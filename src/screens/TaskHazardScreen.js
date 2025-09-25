@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardApi } from '../services';
 import AddTaskHazardModal from '../components/AddTaskHazardModal';
+import TaskHazardDetailsModal from '../components/TaskHazardDetailsModal';
 import TaskHazardMapView from '../components/TaskHazardMapView';
 
 const TaskHazardScreen = () => {
@@ -22,6 +23,8 @@ const TaskHazardScreen = () => {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreatingTaskHazard, setIsCreatingTaskHazard] = useState(false);
+  const [selectedTaskHazard, setSelectedTaskHazard] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
   // Load task hazards on component mount
@@ -112,10 +115,6 @@ const TaskHazardScreen = () => {
     );
   };
 
-  const calculateHighestRiskScore = (risks) => {
-    if (!risks || risks.length === 0) return 1;
-    return Math.max(...risks.map(risk => risk.asIsLikelihood * risk.asIsConsequence));
-  };
 
   const getRiskColor = (risk) => {
     if (risk <= 4) return '#22c55e'; // green - low
@@ -136,7 +135,6 @@ const TaskHazardScreen = () => {
   };
 
   const renderTaskHazardItem = ({ item }) => {
-    const highestRisk = calculateHighestRiskScore(item.risks);
     const dateTime = `${item.date} ${item.time}`;
 
     return (
@@ -175,13 +173,6 @@ const TaskHazardScreen = () => {
             </View>
 
             <View style={styles.riskAndIndividuals}>
-              <View style={styles.riskContainer}>
-                <Text style={styles.riskLabel}>Risk Score: </Text>
-                <View style={[styles.riskBadge, { backgroundColor: getRiskColor(highestRisk) }]}>
-                  <Text style={styles.riskText}>{highestRisk}</Text>
-                </View>
-              </View>
-              
               {item.individual && (
                 <Text style={styles.individualsText}>
                   {item.individual.split(',').length} individual(s)
@@ -210,30 +201,13 @@ const TaskHazardScreen = () => {
   };
 
   const handleTaskHazardInfo = (taskHazard) => {
-    const highestRisk = calculateHighestRiskScore(taskHazard.risks);
-    const riskCount = taskHazard.risks?.length || 0;
-    const individualCount = taskHazard.individual ? taskHazard.individual.split(',').length : 0;
-    
-    const detailsText = [
-      `ID: ${taskHazard.id}`,
-      `Scope: ${taskHazard.scopeOfWork}`,
-      `Date/Time: ${taskHazard.date} ${taskHazard.time}`,
-      `Location: ${taskHazard.location}`,
-      `Status: ${taskHazard.status}`,
-      `Supervisor: ${taskHazard.supervisor || 'N/A'}`,
-      `Individuals: ${individualCount}`,
-      `Risks: ${riskCount}`,
-      `Highest Risk Score: ${highestRisk}`,
-      `System Lockout: ${taskHazard.systemLockoutRequired ? 'Yes' : 'No'}`,
-      `Trained Workforce: ${taskHazard.trainedWorkforce ? 'Yes' : 'No'}`,
-      `Created: ${new Date(taskHazard.createdAt).toLocaleDateString() || 'N/A'}`
-    ].join('\n');
+    setSelectedTaskHazard(taskHazard);
+    setShowDetailsModal(true);
+  };
 
-    Alert.alert(
-      'Task Hazard Details',
-      detailsText,
-      [{ text: 'OK' }]
-    );
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedTaskHazard(null);
   };
 
   const renderEmptyState = () => (
@@ -359,6 +333,15 @@ const TaskHazardScreen = () => {
         onClose={() => setShowAddModal(false)}
         onSubmit={handleCreateTaskHazard}
         isLoading={isCreatingTaskHazard}
+      />
+
+      {/* Task Hazard Details Modal */}
+      <TaskHazardDetailsModal
+        visible={showDetailsModal}
+        onClose={closeDetailsModal}
+        taskHazard={selectedTaskHazard}
+        getRiskColor={getRiskColor}
+        getStatusColor={getStatusColor}
       />
     </View>
   );
