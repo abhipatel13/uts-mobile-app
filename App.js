@@ -4,7 +4,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from './src/services/AuthService';
+import OfflineApiService from './src/services/OfflineApiService';
+import NetworkService from './src/services/NetworkService';
+import LocationService from './src/services/LocationService';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
@@ -200,37 +204,79 @@ function MainAppNavigator() {
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isOfflineReady, setIsOfflineReady] = useState(false);
 
   useEffect(() => {
-    checkAuthStatus();
-    
-    // Set global logout handler
-    setGlobalLogoutHandler(() => {
-      setIsAuthenticated(false);
-    });
-    
-    // Set global auth refresh handler
-    setGlobalAuthRefreshHandler(() => {
-      console.log('Global auth refresh handler called');
-      checkAuthStatus();
-    });
-    
-    // Poll for auth status changes (as backup)
-    const authCheckInterval = setInterval(() => {
-      if (!isAuthenticated) {
+    initializeApp();
+  }, []);
+
+  const initializeApp = async () => {
+    try {
+      // Initialize offline services first
+      await OfflineApiService.initialize();
+      setIsOfflineReady(true);
+      
+      // Initialize location service
+      await LocationService.initialize();
+      
+      // Set global logout handler
+      setGlobalLogoutHandler(() => {
+        setIsAuthenticated(false);
+      });
+      
+      // Set global auth refresh handler
+      setGlobalAuthRefreshHandler(() => {
+        console.log('Global auth refresh handler called');
         checkAuthStatus();
-      }
-    }, 1000);
-    
-    return () => clearInterval(authCheckInterval);
-  }, [isAuthenticated]);
+      });
+      
+      // Set up network monitoring
+      NetworkService.addListener((networkStatus) => {
+        console.log('Network status changed:', networkStatus);
+        if (networkStatus.isOnline && isAuthenticated) {
+          // Attempt to sync data when back online
+          OfflineApiService.syncAllData().catch(error => {
+            console.log('Sync failed:', error.message);
+          });
+        }
+      });
+      
+      // Check authentication status last
+      await checkAuthStatus();
+      
+    } catch (error) {
+      console.error('App initialization failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      NetworkService.cleanup();
+      LocationService.cleanup();
+    };
+  }, []);
 
   const checkAuthStatus = async () => {
     try {
       console.log('Checking authentication status...');
-      const authenticated = await AuthService.isAuthenticated();
+      
+      // Direct check of AsyncStorage
+      const user = await AsyncStorage.getItem('user');
+      const token = await AsyncStorage.getItem('authToken');
+      const authenticated = !!(user && token);
+      
+      console.log('User exists:', !!user);
+      console.log('Token exists:', !!token);
       console.log('Authentication status:', authenticated);
+      
       setIsAuthenticated(authenticated);
+      
+      if (authenticated) {
+        console.log('User authenticated successfully');
+      }
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
