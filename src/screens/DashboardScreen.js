@@ -10,17 +10,11 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import OfflineApiService from '../services/OfflineApiService';
-import NetworkService from '../services/NetworkService';
 import LocationService from '../services/LocationService';
-import MockOfflineService from '../services/MockOfflineService';
 
 const DashboardScreen = ({ navigation }) => {
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
-  const [networkStatus, setNetworkStatus] = useState(null);
-  const [databaseStats, setDatabaseStats] = useState(null);
   const [locationStatus, setLocationStatus] = useState(null);
-  const [mockOfflineMode, setMockOfflineMode] = useState(false);
 
   useEffect(() => {
     const onChange = (result) => {
@@ -37,161 +31,14 @@ const DashboardScreen = ({ navigation }) => {
 
   const initializeDashboard = async () => {
     try {
-      // Get network status
-      const network = NetworkService.getNetworkStatus();
-      setNetworkStatus(network);
-
-      // Get database statistics
-      const stats = await OfflineApiService.getDatabaseStats();
-      setDatabaseStats(stats);
-
       // Get location status
       const location = LocationService.getLocationStatus();
       setLocationStatus(location);
-
-      // Set up network monitoring
-      const removeListener = NetworkService.addListener((status) => {
-        setNetworkStatus(status);
-      });
-
-      return () => removeListener();
     } catch (error) {
-      console.error('Dashboard initialization error:', error);
+      // Dashboard initialization error handled silently
     }
   };
 
-  const handleSyncData = async () => {
-    try {
-      if (!networkStatus?.isOnline) {
-        Alert.alert('Offline', 'No internet connection available for sync');
-        return;
-      }
-
-      Alert.alert(
-        'Sync Data',
-        'This will sync all offline data with the server. Continue?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sync',
-            onPress: async () => {
-              try {
-                await OfflineApiService.syncAllData();
-                Alert.alert('Success', 'Data synchronized successfully');
-                // Refresh database stats
-                const stats = await OfflineApiService.getDatabaseStats();
-                setDatabaseStats(stats);
-              } catch (error) {
-                Alert.alert('Sync Failed', error.message);
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to sync data');
-    }
-  };
-
-  const handleCreateSampleData = async () => {
-    try {
-      Alert.alert(
-        'Create Sample Data',
-        'This will create sample mining data for testing offline functionality. Continue?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Create',
-            onPress: async () => {
-              try {
-                // Create sample equipment
-                await OfflineApiService.createEquipment({
-                  name: 'Excavator #001',
-                  type: 'excavator',
-                  location: 'Surface Level',
-                  status: 'operational',
-                  lastInspection: new Date().toISOString()
-                });
-
-                await OfflineApiService.createEquipment({
-                  name: 'Haul Truck #002',
-                  type: 'truck',
-                  location: 'Underground Level 1',
-                  status: 'maintenance',
-                  lastInspection: new Date().toISOString()
-                });
-
-                // Create sample hazards
-                await OfflineApiService.createHazard({
-                  title: 'Rock Fall Risk',
-                  description: 'Potential rock fall in tunnel section A',
-                  hazardType: 'geological',
-                  riskLevel: 'high',
-                  location: 'Tunnel A',
-                  reportedBy: 'Safety Inspector',
-                  status: 'open'
-                });
-
-                await OfflineApiService.createHazard({
-                  title: 'Equipment Malfunction',
-                  description: 'Hydraulic leak in excavator',
-                  hazardType: 'equipment',
-                  riskLevel: 'medium',
-                  location: 'Equipment Zone B',
-                  reportedBy: 'Equipment Operator',
-                  status: 'investigating'
-                });
-
-                // Create sample risk assessment
-                await OfflineApiService.createRiskAssessment({
-                  title: 'Underground Safety Assessment',
-                  location: 'Underground Level 1',
-                  mineSection: 'Level 1',
-                  riskLevel: 'medium',
-                  probability: 3,
-                  impact: 4,
-                  mitigationMeasures: 'Install additional support beams',
-                  assessedBy: 'Safety Manager',
-                  status: 'draft'
-                });
-
-                // Create sample task hazard
-                await OfflineApiService.createTaskHazard({
-                  taskName: 'Equipment Maintenance',
-                  description: 'Routine maintenance of excavator',
-                  location: 'Equipment Zone A',
-                  mineSection: 'Surface',
-                  hazardIdentification: 'Potential hydraulic leaks',
-                  riskControls: 'Wear protective equipment',
-                  assignedTo: 'Maintenance Team',
-                  supervisor: 'Maintenance Supervisor',
-                  status: 'pending'
-                });
-
-                // Save sample location
-                await OfflineApiService.saveLocation({
-                  name: 'Mine Entrance',
-                  type: 'surface',
-                  coordinates: '40.7128,-74.0060',
-                  description: 'Main mine entrance'
-                });
-
-                Alert.alert('Success', 'Sample data created successfully!');
-                
-                // Refresh database stats
-                const stats = await OfflineApiService.getDatabaseStats();
-                setDatabaseStats(stats);
-              } catch (error) {
-                Alert.alert('Error', 'Failed to create sample data: ' + error.message);
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to create sample data');
-    }
-  };
 
   const { width, height } = screenData;
   const isTablet = width >= 768;
@@ -309,42 +156,11 @@ const DashboardScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Offline Status Cards */}
-      <View style={styles.offlineStatusContainer}>
-        <Text style={styles.sectionTitle}>Mine Operations Status</Text>
-        
-        {/* Network Status */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusCardHeader}>
-            <Ionicons 
-              name={networkStatus?.isOnline ? "wifi-outline" : "cloud-offline-outline"} 
-              size={20} 
-              color={networkStatus?.isOnline ? "#22c55e" : "#ef4444"} 
-            />
-            <Text style={styles.statusCardTitle}>
-              {networkStatus?.isOnline ? "Online" : "Offline"}
-            </Text>
-          </View>
-          <Text style={styles.statusCardSubtitle}>
-            {networkStatus?.isOnline ? "Connected to server" : "Working offline - data saved locally"}
-          </Text>
-        </View>
 
-        {/* Database Status */}
-        {databaseStats && (
-          <View style={styles.statusCard}>
-            <View style={styles.statusCardHeader}>
-              <Ionicons name="server-outline" size={20} color="#3b82f6" />
-              <Text style={styles.statusCardTitle}>Local Database</Text>
-            </View>
-            <Text style={styles.statusCardSubtitle}>
-              {databaseStats.equipment} Equipment • {databaseStats.hazards} Hazards • {databaseStats.riskAssessments} Risk Assessments
-            </Text>
-          </View>
-        )}
-
-        {/* Location Status */}
-        {locationStatus && (
+      {/* Location Status */}
+      {locationStatus && (
+        <View style={styles.offlineStatusContainer}>
+          <Text style={styles.sectionTitle}>Location Status</Text>
           <View style={styles.statusCard}>
             <View style={styles.statusCardHeader}>
               <Ionicons 
@@ -360,56 +176,8 @@ const DashboardScreen = ({ navigation }) => {
               {locationStatus.hasPermission ? "Location tracking enabled" : "Location permission required"}
             </Text>
           </View>
-        )}
-
-        {/* Sync Button */}
-        <TouchableOpacity 
-          style={[
-            styles.syncButton, 
-            { backgroundColor: networkStatus?.isOnline ? "#22c55e" : "#6b7280" }
-          ]}
-          onPress={handleSyncData}
-          disabled={!networkStatus?.isOnline}
-        >
-          <Ionicons name="sync-outline" size={20} color="#fff" />
-          <Text style={styles.syncButtonText}>
-            {networkStatus?.isOnline ? "Sync Data" : "Offline Mode"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Mock Offline Testing Button */}
-        <TouchableOpacity 
-          style={[
-            styles.mockOfflineButton,
-            { backgroundColor: mockOfflineMode ? "#ef4444" : "#3b82f6" }
-          ]}
-          onPress={() => {
-            const newMode = MockOfflineService.toggleOfflineMode();
-            setMockOfflineMode(newMode);
-            Alert.alert(
-              'Mock Offline Mode',
-              newMode ? 'Simulating offline conditions' : 'Back to online mode',
-              [{ text: 'OK' }]
-            );
-          }}
-        >
-          <Ionicons name={mockOfflineMode ? "wifi-off-outline" : "wifi-outline"} size={20} color="#fff" />
-          <Text style={styles.mockOfflineButtonText}>
-            {mockOfflineMode ? "Exit Mock Offline" : "Test Offline Mode"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Create Sample Data Button */}
-        <TouchableOpacity 
-          style={styles.sampleDataButton}
-          onPress={handleCreateSampleData}
-        >
-          <Ionicons name="add-circle-outline" size={20} color="#fff" />
-          <Text style={styles.sampleDataButtonText}>
-            Create Sample Data
-          </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
 
       {/* Main Dashboard Cards */}
       <View style={styles.cardsContainer}>
@@ -654,49 +422,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     lineHeight: 20,
-  },
-  syncButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  syncButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  mockOfflineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  mockOfflineButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  sampleDataButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
-    backgroundColor: '#8b5cf6',
-  },
-  sampleDataButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
   },
 });
 

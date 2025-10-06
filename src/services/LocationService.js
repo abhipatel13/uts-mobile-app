@@ -1,5 +1,4 @@
 import * as Location from 'expo-location';
-import OfflineApiService from './OfflineApiService';
 
 /**
  * Location Service for Mine Operations
@@ -30,7 +29,6 @@ class LocationService {
       this.startLocationWatching();
       
       this.isInitialized = true;
-      console.log('Location service initialized');
     } catch (error) {
       console.error('Location service initialization failed:', error);
       throw error;
@@ -48,8 +46,6 @@ class LocationService {
       if (status !== 'granted') {
         throw new Error('Location permission not granted');
       }
-      
-      console.log('Location permission granted');
     } catch (error) {
       console.error('Error requesting location permission:', error);
       throw error;
@@ -80,10 +76,7 @@ class LocationService {
         source: 'gps'
       };
 
-      // Save location to database
-      await this.saveLocation(this.currentLocation);
-      
-      console.log('Current location:', this.currentLocation);
+      // Location tracking (no offline database)
       return this.currentLocation;
     } catch (error) {
       console.error('Error getting current location:', error);
@@ -118,8 +111,6 @@ class LocationService {
           this.handleLocationUpdate(location);
         }
       );
-      
-      console.log('Location watching started');
     } catch (error) {
       console.error('Error starting location watching:', error);
     }
@@ -132,7 +123,6 @@ class LocationService {
     if (this.watchId) {
       this.watchId.remove();
       this.watchId = null;
-      console.log('Location watching stopped');
     }
   }
 
@@ -154,10 +144,7 @@ class LocationService {
       if (this.hasLocationChanged(newLocation)) {
         this.currentLocation = newLocation;
         
-        // Save location to database
-        await this.saveLocation(newLocation);
-        
-        console.log('Location updated:', newLocation);
+        // Location tracking (no offline database)
       }
     } catch (error) {
       console.error('Error handling location update:', error);
@@ -199,55 +186,12 @@ class LocationService {
     return R * c; // Distance in meters
   }
 
-  /**
-   * Save location to database
-   */
-  async saveLocation(locationData) {
-    try {
-      const locationRecord = {
-        name: `Location ${new Date().toISOString()}`,
-        type: 'gps',
-        coordinates: `${locationData.latitude},${locationData.longitude}`,
-        accuracy: locationData.accuracy,
-        altitude: locationData.altitude,
-        timestamp: locationData.timestamp,
-        source: locationData.source
-      };
-
-      await OfflineApiService.saveLocation(locationRecord);
-    } catch (error) {
-      console.error('Error saving location:', error);
-    }
-  }
 
   /**
-   * Get last known location from database
+   * Get last known location (from memory only)
    */
   async getLastKnownLocation() {
-    try {
-      const locations = await OfflineApiService.getLocations();
-      if (locations.length > 0) {
-        const lastLocation = locations
-          .filter(loc => loc.type === 'gps')
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-        
-        if (lastLocation) {
-          const [lat, lng] = lastLocation.coordinates.split(',');
-          return {
-            latitude: parseFloat(lat),
-            longitude: parseFloat(lng),
-            accuracy: lastLocation.accuracy,
-            altitude: lastLocation.altitude,
-            timestamp: lastLocation.timestamp,
-            source: 'cached'
-          };
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting last known location:', error);
-      return null;
-    }
+    return this.currentLocation;
   }
 
   /**
@@ -297,8 +241,6 @@ class LocationService {
       mineBeacons.forEach(beacon => {
         this.beacons.set(beacon.id, beacon);
       });
-
-      console.log('Mine beacons configured:', mineBeacons.length);
     } catch (error) {
       console.error('Error setting up beacons:', error);
     }
@@ -415,42 +357,11 @@ class LocationService {
   }
 
   /**
-   * Check if location is in hazard zone
+   * Check if location is in hazard zone (simplified - no offline database)
    */
   async isInHazardZone(location = null) {
-    try {
-      const currentLoc = location || this.currentLocation;
-      if (!currentLoc) return false;
-
-      // Get all hazard locations from database
-      const hazards = await OfflineApiService.getHazards();
-      
-      for (const hazard of hazards) {
-        if (hazard.location) {
-          const [hazardLat, hazardLng] = hazard.location.split(',');
-          const distance = this.calculateDistance(
-            currentLoc.latitude,
-            currentLoc.longitude,
-            parseFloat(hazardLat),
-            parseFloat(hazardLng)
-          );
-          
-          // If within 50 meters of a hazard
-          if (distance < 50) {
-            return {
-              isInHazard: true,
-              hazard: hazard,
-              distance: distance
-            };
-          }
-        }
-      }
-
-      return { isInHazard: false };
-    } catch (error) {
-      console.error('Error checking hazard zone:', error);
-      return { isInHazard: false };
-    }
+    // Simplified implementation without offline database
+    return { isInHazard: false };
   }
 
   /**
@@ -473,7 +384,6 @@ class LocationService {
     this.stopLocationWatching();
     this.beacons.clear();
     this.isInitialized = false;
-    console.log('Location service cleaned up');
   }
 }
 
