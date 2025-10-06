@@ -8,21 +8,36 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const SafetyScreen = () => {
+const SafetyScreen = ({ navigation }) => {
   const safetyItems = [
     {
       title: 'Task Hazard',
       description: 'Create and manage task hazard assessments',
       icon: 'warning-outline',
       color: '#f59e0b',
+      route: 'TaskHazard',
     },
     {
       title: 'Risk Assessment',
       description: 'Evaluate and manage risk assessments',
       icon: 'shield-checkmark-outline',
       color: '#22c55e',
+      route: 'RiskAssessment',
     },
   ];
+
+  const handleSafetyItemPress = (item) => {
+    try {
+      navigation.navigate(item.route);
+    } catch (error) {
+      console.error('SafetyScreen: handleSafetyItemPress - Navigation error:', error.message);
+    }
+  };
+
+  const handleCreateAssessment = () => {
+    // For now, navigate to TaskHazard as default
+    navigation.navigate('TaskHazard');
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -33,7 +48,12 @@ const SafetyScreen = () => {
 
       <View style={styles.cardsContainer}>
         {safetyItems.map((item, index) => (
-          <TouchableOpacity key={index} style={styles.card}>
+          <TouchableOpacity 
+            key={index} 
+            style={styles.card}
+            onPress={() => handleSafetyItemPress(item)}
+            activeOpacity={0.7}
+          >
             <View style={[styles.cardIcon, { backgroundColor: item.color }]}>
               <Ionicons name={item.icon} size={24} color="#fff" />
             </View>
@@ -48,7 +68,11 @@ const SafetyScreen = () => {
 
       <View style={styles.quickActionsContainer}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <TouchableOpacity style={styles.quickActionCard}>
+        <TouchableOpacity 
+          style={styles.quickActionCard}
+          onPress={handleCreateAssessment}
+          activeOpacity={0.7}
+        >
           <Ionicons name="add-circle-outline" size={32} color="#22c55e" />
           <Text style={styles.quickActionText}>Create New Assessment</Text>
         </TouchableOpacity>

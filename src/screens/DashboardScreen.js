@@ -35,7 +35,39 @@ const DashboardScreen = ({ navigation }) => {
       const location = LocationService.getLocationStatus();
       setLocationStatus(location);
     } catch (error) {
-      // Dashboard initialization error handled silently
+      console.error('DashboardScreen: initializeDashboard - Error:', error.message);
+    }
+  };
+
+  const handleQuickAction = (action) => {
+    try {
+      switch (action.action) {
+        case 'createTaskHazard':
+          navigation.navigate('Safety', { 
+            screen: 'TaskHazard',
+            params: { showAddModal: true }
+          });
+          break;
+        case 'createRiskAssessment':
+          navigation.navigate('Safety', { 
+            screen: 'RiskAssessment',
+            params: { showAddModal: true }
+          });
+          break;
+        case 'viewAssets':
+          navigation.navigate('AssetHierarchy');
+          break;
+        case 'viewAnalytics':
+          navigation.navigate('Analytics');
+          break;
+        default:
+          // Fallback to route navigation
+          navigation.navigate(action.route);
+          break;
+      }
+    } catch (error) {
+      console.error('DashboardScreen: handleQuickAction - Navigation error:', error.message);
+      Alert.alert('Navigation Error', 'Unable to navigate to the requested screen. Please try again.');
     }
   };
 
@@ -43,6 +75,7 @@ const DashboardScreen = ({ navigation }) => {
   const { width, height } = screenData;
   const isTablet = width >= 768;
   const isSmallScreen = width < 360;
+  
   const userInfo = {
     email: 'hello1@utahtechnicalservicesllc.com',
     role: 'Superuser',
@@ -87,24 +120,36 @@ const DashboardScreen = ({ navigation }) => {
       subtitle: 'Start a new assessment',
       color: '#fef3c7',
       textColor: '#92400e',
+      icon: 'add-circle-outline',
+      route: 'Safety',
+      action: 'createTaskHazard',
     },
     {
       title: 'Risk Assessment',
       subtitle: 'Evaluate risks',
       color: '#dbeafe',
       textColor: '#1e40af',
+      icon: 'shield-checkmark-outline',
+      route: 'Safety',
+      action: 'createRiskAssessment',
     },
     {
       title: 'View Assets',
       subtitle: 'Browse hierarchy',
       color: '#d1fae5',
       textColor: '#065f46',
+      icon: 'git-network-outline',
+      route: 'AssetHierarchy',
+      action: 'viewAssets',
     },
     {
       title: 'Analytics',
       subtitle: 'View reports',
       color: '#ede9fe',
       textColor: '#6b21a8',
+      icon: 'bar-chart-outline',
+      route: 'Analytics',
+      action: 'viewAnalytics',
     },
   ];
 
@@ -185,7 +230,9 @@ const DashboardScreen = ({ navigation }) => {
           <TouchableOpacity
             key={index}
             style={styles.card}
-            onPress={() => navigation.navigate(card.route)}
+            onPress={() => {
+              navigation.navigate(card.route);
+            }}
           >
             <View style={[styles.cardIcon, { backgroundColor: card.color }]}>
               <Ionicons name={card.icon} size={24} color="#fff" />
@@ -204,10 +251,18 @@ const DashboardScreen = ({ navigation }) => {
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={[styles.quickActionsGrid, dynamicStyles.quickActionsGrid]}>
           {quickActions.map((action, index) => (
-            <TouchableOpacity key={index} style={[styles.quickActionCard, dynamicStyles.quickActionCard, { backgroundColor: action.color }]}>
-              <Text style={[styles.quickActionTitle, { color: action.textColor }]}>
-                {action.title}
-              </Text>
+            <TouchableOpacity 
+              key={index} 
+              style={[styles.quickActionCard, dynamicStyles.quickActionCard, { backgroundColor: action.color }]}
+              onPress={() => handleQuickAction(action)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.quickActionHeader}>
+                <Ionicons name={action.icon} size={20} color={action.textColor} />
+                <Text style={[styles.quickActionTitle, { color: action.textColor }]}>
+                  {action.title}
+                </Text>
+              </View>
               <Text style={[styles.quickActionSubtitle, { color: action.textColor }]}>
                 {action.subtitle}
               </Text>
@@ -224,9 +279,6 @@ const DashboardScreen = ({ navigation }) => {
 const createDynamicStyles = (width, isTablet, isSmallScreen) => {
   const padding = isSmallScreen ? 12 : isTablet ? 32 : 20;
   const cardGap = isSmallScreen ? 8 : isTablet ? 16 : 12;
-  const quickActionWidth = isTablet 
-    ? (width - (padding * 2) - (cardGap * 3)) / 4 
-    : (width - (padding * 2) - cardGap) / 2;
 
   return StyleSheet.create({
     infoCardsContainer: {
@@ -235,11 +287,15 @@ const createDynamicStyles = (width, isTablet, isSmallScreen) => {
     },
     quickActionsGrid: {
       gap: cardGap,
-      justifyContent: isTablet ? 'flex-start' : 'space-between',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
     },
     quickActionCard: {
-      width: quickActionWidth,
-      minHeight: isTablet ? 100 : 80,
+      width: isTablet ? '22%' : isSmallScreen ? '48%' : '48%',
+      minHeight: isTablet ? 100 : isSmallScreen ? 85 : 90,
+      marginBottom: cardGap,
+      padding: isSmallScreen ? 12 : 16,
     },
   });
 };
@@ -375,22 +431,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between',
   },
   quickActionCard: {
-    flex: 1,
+    width: '48%',
     padding: 16,
     borderRadius: 12,
-    minHeight: 80,
+    minHeight: 90,
     justifyContent: 'center',
-    maxWidth: '48%',
+    marginBottom: 12,
+  },
+  quickActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   quickActionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
+    marginLeft: 6,
+    flex: 1,
+    lineHeight: 18,
   },
   quickActionSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
+    lineHeight: 14,
+    opacity: 0.8,
   },
   offlineStatusContainer: {
     paddingHorizontal: 20,
