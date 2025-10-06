@@ -2,12 +2,11 @@ import React, { useState, useEffect, createRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from './src/services/AuthService';
 import LocationService from './src/services/LocationService';
-import HybridStorage from './src/services/HybridStorage';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
@@ -24,7 +23,6 @@ import TaskHazardScreen from './src/screens/TaskHazardScreen';
 import RiskAssessmentScreen from './src/screens/RiskAssessmentScreen';
 import TaskHazardAnalyticsScreen from './src/screens/TaskHazardAnalyticsScreen';
 import RiskAssessmentAnalyticsScreen from './src/screens/RiskAssessmentAnalyticsScreen';
-import UserManagementScreen from './src/screens/UserManagementScreen';
 import ApprovalRequestsScreen from './src/screens/ApprovalRequestsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -43,6 +41,39 @@ function HeaderMenuButton({ onPress }) {
 
 // Sidebar Modal Component
 function SidebarModal({ visible, onClose, navigation, currentRoute }) {
+  const slideAnim = useState(new Animated.Value(-280))[0];
+  const fadeAnim = useState(new Animated.Value(0))[0];
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -280,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+  }, [visible, slideAnim, fadeAnim]);
+
   const handleNavigate = (routeName) => {
     onClose();
     if (navigation && navigation.navigate) {
@@ -53,12 +84,12 @@ function SidebarModal({ visible, onClose, navigation, currentRoute }) {
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
       transparent={true}
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.sidebarContainer}>
+        <Animated.View style={[styles.sidebarContainer, { transform: [{ translateX: slideAnim }] }]}>
           <CustomDrawerContent 
             navigation={{
               navigate: handleNavigate,
@@ -69,11 +100,13 @@ function SidebarModal({ visible, onClose, navigation, currentRoute }) {
               index: 0 
             }}
           />
-        </View>
-        <TouchableOpacity
-          style={styles.modalBackground}
-          onPress={onClose}
-        />
+        </Animated.View>
+        <Animated.View style={[styles.modalBackground, { opacity: fadeAnim }]}>
+          <TouchableOpacity
+            style={styles.modalBackgroundTouchable}
+            onPress={onClose}
+          />
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -172,13 +205,6 @@ function MainAppNavigator() {
         }}
       />
       <Stack.Screen 
-        name="UserManagement" 
-        component={UserManagementScreen}
-        options={{
-          title: 'User Management',
-        }}
-      />
-      <Stack.Screen 
         name="ApprovalRequests" 
         component={ApprovalRequestsScreen}
         options={{
@@ -210,8 +236,6 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
-      // Initialize hybrid storage (includes network monitoring)
-      await HybridStorage.initialize();
       
       // Initialize location service
       await LocationService.initialize();
@@ -301,5 +325,8 @@ const styles = StyleSheet.create({
   modalBackground: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalBackgroundTouchable: {
+    flex: 1,
   },
 });

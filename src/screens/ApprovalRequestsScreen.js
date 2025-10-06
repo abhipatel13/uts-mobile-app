@@ -60,14 +60,9 @@ const ApprovalRequestsScreen = () => {
         params._t = Date.now();
       }
 
-      console.log('Fetching approvals with params:', params);
       const response = await TaskHazardApi.getApprovals({includeInvalidated: true});
       const data = response.data || {};
-      
-      console.log('API Response:', response);
-      console.log('Data received:', data);
-      console.log('Task Hazards count:', data.taskHazards?.length || 0);
-      
+    
       setApprovalRequests(data.taskHazards || []);
       
       if (isRefresh) {
@@ -90,7 +85,6 @@ const ApprovalRequestsScreen = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refresh button clicked, fetching approval requests...');
     fetchApprovalRequests(true);
   };
 
@@ -133,7 +127,7 @@ const ApprovalRequestsScreen = () => {
       setComments('');
 
     } catch (error) {
-      console.error(`Error ${approvalAction}ing task hazard:`, error);
+      console.error(`Error ${appxrovalAction}ing task hazard:`, error);
       Alert.alert(
         'Error',
         error.message || `Failed to ${approvalAction} task hazard. Please try again.`,

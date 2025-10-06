@@ -7,12 +7,12 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AssetHierarchyApi from '../services/AssetHierarchyApi';
+import { AssetHierarchyApi } from '../services';
 import { buildAssetHierarchy, flattenAssetHierarchy } from '../utils/assetUtils';
+import AssetDetailsModal from '../components/AssetDetailsModal';
 
 const AssetHierarchyScreen = () => {
   const [expandedItems, setExpandedItems] = useState({});
@@ -21,11 +21,18 @@ const AssetHierarchyScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Load assets on component mount
   useEffect(() => {
     fetchAssets();
   }, []);
+
+  // Update flattened assets when assets or expanded items change
+  useEffect(() => {
+    updateFlattenedAssets();
+  }, [assets, expandedItems]);
 
   const fetchAssets = async (isRefresh = false) => {
     try {
@@ -38,130 +45,208 @@ const AssetHierarchyScreen = () => {
 
       const response = await AssetHierarchyApi.getAll();
       const apiAssets = response.data || [];
-      
+
+      if (!Array.isArray(apiAssets)) {
+        throw new Error('Invalid response format from server');
+      }
+
       setAssets(apiAssets);
-      const flattened = flattenAssetHierarchy(apiAssets);
-      setFlattenedAssets(flattened);
+
+      // Auto-expand root assets on initial load
+      if (!isRefresh && apiAssets.length > 0) {
+        const rootAssets = apiAssets.filter(asset => !asset.parent);
+        const expandedState = {};
+        rootAssets.forEach(asset => {
+          expandedState[asset.id] = true;
+        });
+        setExpandedItems(expandedState);
+      }
+
     } catch (error) {
-      console.error('Error fetching assets:', error);
-      setError('Failed to load assets. Please try again.');
+      console.error('AssetHierarchyScreen: fetchAssets - Error occurred:', error.message);
+      setError(error.message || 'Failed to load assets. Please try again.');
+      
+      // Show alert for errors
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to load assets. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  const handleRefresh = async () => {
-    await fetchAssets(true);
+  const updateFlattenedAssets = () => {
+    if (assets.length === 0) {
+      setFlattenedAssets([]);
+      return;
+    }
+
+    // Build hierarchy
+    const hierarchicalAssets = buildAssetHierarchy(assets);
+    
+    // Flatten with respect to expanded state
+    const flattened = flattenHierarchyWithExpansion(hierarchicalAssets, 0);
+    setFlattenedAssets(flattened);
   };
 
-  const toggleExpanded = (itemId) => {
+  const flattenHierarchyWithExpansion = (hierarchicalAssets, level = 0) => {
+    let flattened = [];
+
+    hierarchicalAssets.forEach(asset => {
+      // Add current asset with level
+      flattened.push({
+        ...asset,
+        level,
+        hasChildren: asset.children && asset.children.length > 0
+      });
+
+      // Add children if expanded
+      if (asset.children && asset.children.length > 0 && expandedItems[asset.id]) {
+        flattened = flattened.concat(
+          flattenHierarchyWithExpansion(asset.children, level + 1)
+        );
+      }
+    });
+
+    return flattened;
+  };
+
+  const handleRefresh = () => {
+    fetchAssets(true);
+  };
+
+  const toggleExpand = (itemId) => {
     setExpandedItems(prev => ({
       ...prev,
       [itemId]: !prev[itemId]
     }));
   };
 
-  const handleAssetInfo = (asset) => {
-    Alert.alert(
-      'Asset Information',
-      `Name: ${asset.name || 'N/A'}\nType: ${asset.objectType || 'N/A'}\nDescription: ${asset.description || 'N/A'}\nStatus: ${asset.status || 'N/A'}`,
-      [{ text: 'OK' }]
-    );
-  };
-
-  const renderAssetItem = ({ item, level = 0 }) => {
+  const renderAssetItem = ({ item }) => {
     const isExpanded = expandedItems[item.id];
-    const hasChildren = item.children && item.children.length > 0;
-    const indentStyle = { marginLeft: level * 20 };
+    const indentWidth = item.level * 20; // 20px per level
+    
 
     return (
-      <View>
-        <TouchableOpacity
-          style={[styles.assetItem, indentStyle]}
-          onPress={() => hasChildren ? toggleExpanded(item.id) : handleAssetInfo(item)}
+      <View style={styles.assetItem}>
+        <TouchableOpacity 
+          style={[styles.assetRow, { paddingLeft: 20 + indentWidth }]}
+          onPress={() => item.hasChildren && toggleExpand(item.id)}
         >
-          <View style={styles.assetContent}>
-            <View style={styles.assetInfo}>
-              {hasChildren && (
-                <Ionicons
-                  name={isExpanded ? 'chevron-down' : 'chevron-forward'}
-                  size={16}
-                  color="#666"
-                  style={styles.expandIcon}
-                />
-              )}
-              <Text style={styles.assetName}>{item.name}</Text>
-            </View>
-            <View style={styles.assetActions}>
-              <TouchableOpacity
-                style={styles.infoButton}
-                onPress={() => handleAssetInfo(item)}
-              >
-                <Ionicons name="information-circle-outline" size={20} color="#3b82f6" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
+          <View style={styles.assetInfo}>
+            <View style={styles.expandContainer}>
+              {item.hasChildren ? (
+                <Ionicons 
+                  name={isExpanded ? "chevron-down" : "chevron-forward"} 
+                  size={16} 
+                  color="#64748b" 
 
-        {hasChildren && isExpanded && (
-          <View>
-            {item.children.map(child => (
-              <React.Fragment key={child.id}>
-                {renderAssetItem({ item: child, level: level + 1 })}
-              </React.Fragment>
-            ))}
+                />
+              ) : (
+                <View style={{ width: 16 }} />
+              )}
+              <Text style={styles.assetId}>
+                {item.cmmsInternalId || item.id}
+              </Text>
+            </View>
+            <View style={styles.assetDetails}>
+              <Text style={styles.assetName}>{item.name}</Text>
+              <Text style={styles.assetType}>
+                {item.objectType || (item.parent ? 'Child Asset' : 'Root Asset')}
+              </Text>
+            </View>
           </View>
-        )}
+          <TouchableOpacity 
+            style={styles.infoButton}
+            onPress={() => handleAssetInfo(item)}
+          >
+            <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+          </TouchableOpacity>
+        </TouchableOpacity>
       </View>
     );
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>Loading assets...</Text>
-      </View>
-    );
-  }
+  const handleAssetInfo = (asset) => {
+    console.log('AssetHierarchyScreen: handleAssetInfo - Showing details for asset:', asset.name);
+    setSelectedAsset(asset);
+    setShowDetailsModal(true);
+  };
 
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-        <Text style={styles.errorText}>{error}</Text>
+  const handleCloseDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedAsset(null);
+  };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="folder-outline" size={64} color="#94a3b8" />
+      <Text style={styles.emptyStateTitle}>No Assets Found</Text>
+      <Text style={styles.emptyStateText}>
+        {error ? 'Unable to load assets. Please try again.' : 'No asset hierarchy data available.'}
+      </Text>
+      {error && (
         <TouchableOpacity style={styles.retryButton} onPress={() => fetchAssets()}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="rgb(52, 73, 94)" />
+      <Text style={styles.loadingText}>Loading assets...</Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        {renderLoadingState()}
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Asset Hierarchy</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-          <Ionicons name="refresh" size={20} color="#3b82f6" />
-        </TouchableOpacity>
-      </View>
+      {/* Table Header */}
+      {flattenedAssets.length > 0 && (
+        <View style={styles.tableHeader}>
+          <Text style={styles.columnHeader}>ID</Text>
+          <Text style={styles.columnHeader}>NAME</Text>
+        </View>
+      )}
 
-      {/* Assets List */}
-      <FlatList
-        data={flattenedAssets}
-        renderItem={renderAssetItem}
-        keyExtractor={(item) => item.id.toString()}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            colors={['#3b82f6']}
-          />
-        }
-        style={styles.list}
-        showsVerticalScrollIndicator={false}
+      {/* Asset List */}
+      {flattenedAssets.length > 0 ? (
+        <FlatList
+          data={flattenedAssets}
+          renderItem={renderAssetItem}
+          keyExtractor={(item) => item.id}
+          style={styles.assetList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['rgb(52, 73, 94)']}
+              tintColor="rgb(52, 73, 94)"
+            />
+          }
+        />
+      ) : (
+        renderEmptyState()
+      )}
+
+      {/* Asset Details Modal */}
+      <AssetDetailsModal
+        visible={showDetailsModal}
+        onClose={handleCloseDetailsModal}
+        asset={selectedAsset}
       />
     </View>
   );
@@ -170,94 +255,125 @@ const AssetHierarchyScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748b',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#ef4444',
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1e293b',
+  tableHeader: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  refreshButton: {
-    padding: 8,
+  columnHeader: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  list: {
+  assetList: {
     flex: 1,
   },
   assetItem: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  assetContent: {
+  assetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   assetInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  expandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 20,
   },
-  expandIcon: {
-    marginRight: 8,
+  assetId: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
+    marginLeft: 8,
+  },
+  assetDetails: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   assetName: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
     color: '#1e293b',
-    fontWeight: '500',
+    marginBottom: 2,
   },
-  assetActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  assetType: {
+    fontSize: 12,
+    color: '#64748b',
   },
   infoButton: {
-    padding: 8,
+    padding: 4,
+    marginLeft: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: 'rgb(52, 73, 94)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

@@ -52,8 +52,6 @@ const AddTaskHazardModal = ({
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [showGeoFenceSettings, setShowGeoFenceSettings] = useState(false);
 
-  console.log('users', users);
-
   // Fetch users from API
   const fetchUsers = async () => {
     try {
@@ -63,7 +61,7 @@ const AddTaskHazardModal = ({
         setUsers(response.data);
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('AddTaskHazardModal: fetchUsers failed:', error.message);
       Alert.alert('Error', 'Failed to load users. Please try again.');
     } finally {
       setIsLoadingUsers(false);
@@ -226,14 +224,9 @@ const AddTaskHazardModal = ({
       }
     }
 
-    console.log('newErrors', newErrors);
+    console.log('AddTaskHazardModal: validateStep', step, 'errors:', Object.keys(newErrors).length);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
   };
 
   // iOS-friendly picker handlers
@@ -330,8 +323,6 @@ const AddTaskHazardModal = ({
   };
 
   const handleSubmit = async () => {
-
-    console.log("!validateStep(currentStep)", !validateStep(currentStep));
     if (!validateStep(currentStep)) {
       Alert.alert('Validation Error', 'Please fix all errors before submitting.');
       return;
@@ -352,12 +343,11 @@ const AddTaskHazardModal = ({
       risks: formData.risks
     };
 
-    console.log('taskHazardToCreate', taskHazardToCreate);
-
     try {
       await onSubmit(taskHazardToCreate);
       onClose();
     } catch (error) {
+      console.error('AddTaskHazardModal: handleSubmit failed:', error.message);
       Alert.alert('Error', error.message || 'Failed to create task hazard');
     }
   };

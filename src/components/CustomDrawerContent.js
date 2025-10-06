@@ -68,7 +68,7 @@ export default function CustomDrawerContent(props) {
       const user = await AuthService.getCurrentUser();
       setCurrentUser(user);
     } catch (error) {
-      console.error('Error loading current user:', error);
+      console.error('CustomDrawerContent: loadCurrentUser failed:', error.message);
     }
   };
 
@@ -125,7 +125,7 @@ export default function CustomDrawerContent(props) {
               // Trigger global logout to update auth state in App.js
               triggerGlobalLogout();
             } catch (error) {
-              console.error('Logout error:', error);
+              console.error('CustomDrawerContent: handleLogout failed:', error.message);
               Alert.alert('Error', 'Failed to logout. Please try again.');
             }
           },

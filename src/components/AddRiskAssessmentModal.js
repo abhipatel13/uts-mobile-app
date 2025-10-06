@@ -54,12 +54,11 @@ const AddRiskAssessmentModal = ({
         setUsers(response.data);
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
-      
+      console.error('AddRiskAssessmentModal: fetchUsers failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
+        console.log('AddRiskAssessmentModal: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
-        console.log('Authentication expired, user will be redirected to login');
       } else {
         Alert.alert('Error', 'Failed to load users. Please try again.');
       }
@@ -215,18 +214,17 @@ const AddRiskAssessmentModal = ({
       risks: formData.risks
     };
 
-    console.log('riskAssessmentData', riskAssessmentToCreate);
-
+    console.log('AddRiskAssessmentModal: Submitting risk assessment:', riskAssessmentToCreate);
     try {
       await onSubmit(riskAssessmentToCreate);
+      console.log('AddRiskAssessmentModal: Risk assessment created successfully');
       onClose();
     } catch (error) {
-      console.error('Error creating risk assessment:', error);
-      
+      console.error('AddRiskAssessmentModal: handleSubmit failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
+        console.log('AddRiskAssessmentModal: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
-        console.log('Authentication expired, user will be redirected to login');
         onClose(); // Close modal since user will be logged out
       } else {
         Alert.alert('Error', error.message || 'Failed to create risk assessment');

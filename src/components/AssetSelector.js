@@ -44,12 +44,11 @@ const AssetSelector = ({
       setAssets(assetsWithLevels);
       setFilteredAssets(assetsWithLevels);
     } catch (error) {
-      console.error('Error fetching assets:', error);
-      
+      console.error('AssetSelector: fetchAssets failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
+        console.log('AssetSelector: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
-        console.log('Authentication expired, user will be redirected to login');
       } else {
         Alert.alert('Error', 'Failed to load assets. Please try again.');
       }
