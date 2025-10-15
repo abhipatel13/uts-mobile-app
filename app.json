@@ -45,6 +45,9 @@
         "projectId": "96f1f544-38c2-44c7-88a1-823dbbeeb79c"
       }
     },
-    "owner": "abhipatel8675"
+    "owner": "abhipatel8675",
+    "plugins": [
+      "expo-sqlite"
+    ]
   }
 }

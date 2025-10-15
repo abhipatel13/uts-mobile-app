@@ -8,9 +8,10 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AssetHierarchyApi } from '../services';
+import { AssetHierarchyService } from '../services/AssetHierarchyService';
 import { buildAssetHierarchy, flattenAssetHierarchy } from '../utils/assetUtils';
 import AssetDetailsModal from '../components/AssetDetailsModal';
 
@@ -23,6 +24,7 @@ const AssetHierarchyScreen = () => {
   const [error, setError] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [dataSource, setDataSource] = useState('api'); // 'api' or 'cache'
 
   // Load assets on component mount
   useEffect(() => {
@@ -43,14 +45,16 @@ const AssetHierarchyScreen = () => {
       }
       setError(null);
 
-      const response = await AssetHierarchyApi.getAll();
+      // Use hybrid service that handles online/offline
+      const response = await AssetHierarchyService.getAll();
       const apiAssets = response.data || [];
 
       if (!Array.isArray(apiAssets)) {
-        throw new Error('Invalid response format from server');
+        throw new Error('Invalid response format');
       }
 
       setAssets(apiAssets);
+      setDataSource(response.source);
 
       // Auto-expand root assets on initial load
       if (!isRefresh && apiAssets.length > 0) {
@@ -64,14 +68,7 @@ const AssetHierarchyScreen = () => {
 
     } catch (error) {
       console.error('AssetHierarchyScreen: fetchAssets - Error occurred:', error.message);
-      setError(error.message || 'Failed to load assets. Please try again.');
-      
-      // Show alert for errors
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to load assets. Please try again.',
-        [{ text: 'OK' }]
-      );
+      setError(error.message || 'Failed to load assets.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -213,6 +210,16 @@ const AssetHierarchyScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Offline Mode Indicator */}
+      {dataSource === 'cache' && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+          <Text style={styles.offlineBannerText}>
+            Offline Mode - Showing cached data
+          </Text>
+        </View>
+      )}
+
       {/* Table Header */}
       {flattenedAssets.length > 0 && (
         <View style={styles.tableHeader}>
@@ -256,6 +263,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fbbf24',
+    gap: 8,
+  },
+  offlineBannerText: {
+    fontSize: 13,
+    color: '#92400e',
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',

@@ -12,6 +12,8 @@ import {
   ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthService } from '../services/AuthService';
+import { triggerAuthRefresh } from '../utils/globalHandlers';
 
 export default function LoginScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -101,21 +103,9 @@ export default function LoginScreen({ navigation }) {
         isAuthenticated: true,
       }));
       await AsyncStorage.setItem('authToken', token);
-      
-      console.log('Login successful, user data stored');
-      console.log('Auth state will be automatically detected by App.js polling');
-      
-      // Try to trigger immediate auth refresh, but don't worry if it fails
-      // The polling mechanism will catch it within 1 second
-      setTimeout(() => {
-        try {
-          const { triggerAuthRefresh } = require('../../App');
-          triggerAuthRefresh();
-          console.log('Auth refresh triggered successfully');
-        } catch (importError) {
-          console.log('Using polling fallback for auth state detection');
-        }
-      }, 100);
+            
+      // Trigger immediate auth refresh to navigate to dashboard
+      triggerAuthRefresh();
 
     } catch (error) {
       console.error('Login error:', error);
@@ -125,7 +115,11 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
+    // Clear any existing errors
+    setError('');
+    
+    // Validate email
     if (!formData.email) {
       setError('Please enter your email to reset your password');
       return;
@@ -137,11 +131,27 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    Alert.alert(
-      'Password Reset',
-      `If an account exists for ${formData.email}, we will send a password reset link. Please check your inbox and spam folder.`,
-      [{ text: 'OK' }]
-    );
+    setIsLoading(true);
+    
+    try {
+      const response = await AuthService.forgotPassword(formData.email);
+      
+      if (!response || !response.status) {
+        throw new Error(response?.message || 'Failed to send reset email');
+      }
+
+      // Show success message
+      Alert.alert(
+        'Password Reset Email Sent',
+        `If an account exists for ${formData.email}, we have sent a password reset link. Please check your inbox and spam folder.`,
+        [{ text: 'OK' }]
+      );
+    } catch (apiError) {
+      console.error('Forgot password error:', apiError);
+      setError(apiError.message || 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

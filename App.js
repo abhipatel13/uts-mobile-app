@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from './src/services/AuthService';
 import LocationService from './src/services/LocationService';
+import DatabaseService from './src/services/DatabaseService';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
@@ -236,9 +237,13 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
+      // Initialize database
+      await DatabaseService.initialize();
+      console.log('Database initialized');
       
       // Initialize location service
       await LocationService.initialize();
+      console.log('Location service initialized');
       
       // Set global logout handler
       setGlobalLogoutHandler(() => {
@@ -264,7 +269,7 @@ export default function App() {
   useEffect(() => {
     return () => {
       LocationService.cleanup();
-      HybridStorage.cleanup();
+      DatabaseService.close();
     };
   }, []);
 

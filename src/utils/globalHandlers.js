@@ -19,7 +19,6 @@ export const triggerGlobalLogout = () => {
 };
 
 export const triggerAuthRefresh = () => {
-  console.log('triggerAuthRefresh called, handler exists:', !!globalAuthRefreshHandler);
   if (globalAuthRefreshHandler) {
     globalAuthRefreshHandler();
   } else {

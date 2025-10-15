@@ -11,7 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TaskHazardApi } from '../services';
+import { TaskHazardService } from '../services/TaskHazardService';
 import AddTaskHazardModal from '../components/AddTaskHazardModal';
 import TaskHazardDetailsModal from '../components/TaskHazardDetailsModal';
 import TaskHazardMapView from '../components/TaskHazardMapView';
@@ -26,6 +26,7 @@ const TaskHazardScreen = () => {
   const [selectedTaskHazard, setSelectedTaskHazard] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [dataSource, setDataSource] = useState('api'); // 'api' or 'cache'
 
   // Load task hazards on component mount
   useEffect(() => {
@@ -41,25 +42,19 @@ const TaskHazardScreen = () => {
       }
       setError(null);
 
-      const response = await TaskHazardApi.getAll();
+      // Use hybrid service that handles online/offline
+      const response = await TaskHazardService.getAll();
       const apiTaskHazards = response.data || [];
 
       if (!Array.isArray(apiTaskHazards)) {
-        throw new Error('Invalid response format from server');
+        throw new Error('Invalid response format');
       }
 
       setTaskHazards(apiTaskHazards);
-
+      setDataSource(response.source); // 'api' or 'cache'
     } catch (error) {
       console.error('Error fetching task hazards:', error);
-      setError(error.message || 'Failed to load task hazards. Please try again.');
-      
-      // Show alert for errors
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to load task hazards. Please try again.',
-        [{ text: 'OK' }]
-      );
+      setError(error.message || 'Failed to load task hazards.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -76,7 +71,7 @@ const TaskHazardScreen = () => {
 
       console.log('taskHazardData', taskHazardData);
       
-      await TaskHazardApi.create(taskHazardData);
+      await TaskHazardService.create(taskHazardData);
       
       // Refresh the task hazards list
       await fetchTaskHazards();
@@ -102,7 +97,7 @@ const TaskHazardScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await TaskHazardApi.delete(taskHazardId);
+              await TaskHazardService.delete(taskHazardId);
               await fetchTaskHazards();
               Alert.alert('Success', 'Task Hazard deleted successfully!');
             } catch (error) {
@@ -246,6 +241,16 @@ const TaskHazardScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Offline Mode Indicator */}
+      {dataSource === 'cache' && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+          <Text style={styles.offlineBannerText}>
+            Offline Mode - Showing cached data
+          </Text>
+        </View>
+      )}
+
       {/* Header with View Toggle and Add Button */}
       <View style={styles.header}>
         <View style={styles.headerActions}>
@@ -351,6 +356,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fbbf24',
+    gap: 8,
+  },
+  offlineBannerText: {
+    fontSize: 13,
+    color: '#92400e',
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',
