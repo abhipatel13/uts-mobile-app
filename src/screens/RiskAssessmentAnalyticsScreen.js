@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RiskAssessmentApi } from '../services';
+import { RiskAssessmentService } from '../services';
 import RiskAssessmentMapView from '../components/RiskAssessmentMapView';
 import RiskAssessmentDetailsModal from '../components/RiskAssessmentDetailsModal';
 
@@ -33,6 +33,7 @@ const RiskAssessmentAnalyticsScreen = () => {
   });
   const [selectedRiskAssessment, setSelectedRiskAssessment] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [dataSource, setDataSource] = useState('api');
 
   const statusOptions = ['All', 'Active', 'Inactive', 'Pending', 'Completed'];
 
@@ -49,12 +50,12 @@ const RiskAssessmentAnalyticsScreen = () => {
   const fetchRiskAssessments = async () => {
     try {
       setIsLoading(true);
-      const response = await RiskAssessmentApi.getAll();
+      const response = await RiskAssessmentService.getAll();
       const data = response.data || [];
       setRiskAssessments(data);
+      setDataSource(response.source || 'api');
     } catch (error) {
       console.error('Error fetching risk assessments:', error);
-      Alert.alert('Error', 'Failed to load risk assessment data');
     } finally {
       setIsLoading(false);
     }
@@ -189,6 +190,14 @@ const RiskAssessmentAnalyticsScreen = () => {
 
   return (
     <View style={styles.container}>
+
+      {/* Offline Mode Banner */}
+      {dataSource === 'cache' && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+          <Text style={styles.offlineText}>Offline Mode - Showing cached data</Text>
+        </View>
+      )}
 
       {/* Search and Filter Controls */}
       <View style={styles.controlsContainer}>
@@ -571,6 +580,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     textAlign: 'center',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fbbf24',
+  },
+  offlineText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#92400e',
+    fontWeight: '500',
   },
 });
 

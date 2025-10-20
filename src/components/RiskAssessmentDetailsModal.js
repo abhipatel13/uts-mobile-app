@@ -26,8 +26,23 @@ const RiskAssessmentDetailsModal = ({
   if (!riskAssessment) return null;
 
   const riskCount = riskAssessment.risks?.length || 0;
-  const individualCount = riskAssessment.individuals ? riskAssessment.individuals.split(',').length : 0;
-  const individuals = riskAssessment.individuals ? riskAssessment.individuals.split(',').map(name => name.trim()) : [];
+  const individualCount = (() => {
+    if (Array.isArray(riskAssessment.individuals)) {
+      return riskAssessment.individuals.length;
+    } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals.trim()) {
+      return riskAssessment.individuals.split(',').length;
+    }
+    return 0;
+  })();
+  
+  const individuals = (() => {
+    if (Array.isArray(riskAssessment.individuals)) {
+      return riskAssessment.individuals;
+    } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals.trim()) {
+      return riskAssessment.individuals.split(',').map(name => name.trim());
+    }
+    return [];
+  })();
 
   // Calculate highest risk score
   const calculateHighestRiskScore = (risks) => {

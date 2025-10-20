@@ -22,11 +22,12 @@ import GeoFenceSettings from './GeoFenceSettings';
 import LocationSelector from './LocationSelector';
 import { UserService } from '../services/UserService';
 
-const AddTaskHazardModal = ({ 
+const EditTaskHazardModal = ({ 
   visible, 
   onClose, 
   onSubmit, 
-  isLoading = false 
+  isLoading = false,
+  taskHazard = null
 }) => {
   const [formData, setFormData] = useState({
     date: '',
@@ -61,7 +62,7 @@ const AddTaskHazardModal = ({
         setUsers(response.data);
       }
     } catch (error) {
-      console.error('AddTaskHazardModal: fetchUsers failed:', error.message);
+      console.error('EditTaskHazardModal: fetchUsers failed:', error.message);
       if (!error.message?.includes('connect to the internet')) {
         console.error("Error loading users:", error.message);
       }
@@ -70,26 +71,32 @@ const AddTaskHazardModal = ({
     }
   };
 
-  // Reset form when modal opens/closes
+  // Initialize form data when modal opens or taskHazard changes
   useEffect(() => {
-    if (!visible) {
-      resetForm();
-    } else {
-      // Set default date and time when modal opens
-      const now = new Date();
-      const dateString = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-      const timeString = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
-      
-      setFormData(prev => ({
-        ...prev,
-        date: dateString,
-        time: timeString
-      }));
+    if (visible && taskHazard) {
+      setFormData({
+        date: taskHazard.date || '',
+        time: taskHazard.time || '',
+        scopeOfWork: taskHazard.scopeOfWork || '',
+        assetSystem: taskHazard.assetSystem || '',
+        systemLockoutRequired: taskHazard.systemLockoutRequired || false,
+        trainedWorkforce: taskHazard.trainedWorkforce || false,
+        supervisor: taskHazard.supervisor || '',
+        individual: taskHazard.individual || '',
+        location: taskHazard.location || '',
+        status: taskHazard.status || 'Pending',
+        geoFenceLimit: taskHazard.geoFenceLimit?.toString() || '200',
+        risks: taskHazard.risks || []
+      });
+      setCurrentStep(1);
+      setErrors({});
       
       // Fetch users when modal opens
       fetchUsers();
+    } else if (!visible) {
+      resetForm();
     }
-  }, [visible]);
+  }, [visible, taskHazard]);
 
   const resetForm = () => {
     setFormData({
@@ -185,12 +192,6 @@ const AddTaskHazardModal = ({
 
     if (step === 1) {
       // Basic Information validation
-      if (!formData.date) {
-        newErrors.date = 'Date is required';
-      }
-      if (!formData.time) {
-        newErrors.time = 'Time is required';
-      }
       if (!formData.scopeOfWork.trim()) {
         newErrors.scopeOfWork = 'Scope of Work is required';
       }
@@ -275,7 +276,7 @@ const AddTaskHazardModal = ({
 
   const showStatusPicker = () => {
     if (Platform.OS === 'ios') {
-      const options = ['Cancel', 'Pending', 'Active', 'Inactive'];
+      const options = ['Cancel', 'Pending', 'Active', 'Inactive', 'Completed', 'Rejected'];
       const cancelButtonIndex = 0;
       
       ActionSheetIOS.showActionSheetWithOptions(
@@ -329,7 +330,8 @@ const AddTaskHazardModal = ({
       return;
     }
 
-    const taskHazardToCreate = {
+    const taskHazardToUpdate = {
+      id: taskHazard.id,
       date: formData.date,
       time: formData.time,
       scopeOfWork: formData.scopeOfWork.trim(),
@@ -345,10 +347,10 @@ const AddTaskHazardModal = ({
     };
 
     try {
-      await onSubmit(taskHazardToCreate);
-      onClose();
+      await onSubmit(taskHazardToUpdate);
+      // Modal closing is handled by parent component
     } catch (error) {
-      console.error('AddTaskHazardModal: handleSubmit failed:', error.message);
+      console.error('EditTaskHazardModal: handleSubmit failed:', error.message);
     }
   };
 
@@ -383,27 +385,21 @@ const AddTaskHazardModal = ({
       contentContainerStyle={styles.scrollContentContainer}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Date and Time */}
+      {/* Date and Time - Read Only */}
       <View style={styles.row}>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>Date *</Text>
-          <TextInput
-            style={[styles.input, errors.date && styles.inputError]}
-            value={formData.date}
-            onChangeText={(value) => handleInputChange('date', value)}
-            placeholder="YYYY-MM-DD"
-          />
-          {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
+          <Text style={styles.label}>Date</Text>
+          <View style={[styles.input, styles.readOnlyInput]}>
+            <Text style={styles.readOnlyText}>{formData.date}</Text>
+          </View>
+          <Text style={styles.helpText}>Original creation date (not editable)</Text>
         </View>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>Time *</Text>
-          <TextInput
-            style={[styles.input, errors.time && styles.inputError]}
-            value={formData.time}
-            onChangeText={(value) => handleInputChange('time', value)}
-            placeholder="HH:MM"
-          />
-          {errors.time && <Text style={styles.errorText}>{errors.time}</Text>}
+          <Text style={styles.label}>Time</Text>
+          <View style={[styles.input, styles.readOnlyInput]}>
+            <Text style={styles.readOnlyText}>{formData.time}</Text>
+          </View>
+          <Text style={styles.helpText}>Original creation time (not editable)</Text>
         </View>
       </View>
 
@@ -590,7 +586,6 @@ const AddTaskHazardModal = ({
     );
   };
 
-
   const renderRiskAssessment = () => (
     <View style={styles.stepContent}>
       <TaskRisksComponent
@@ -636,6 +631,8 @@ const AddTaskHazardModal = ({
               <Picker.Item label="Pending" value="Pending" />
               <Picker.Item label="Active" value="Active" />
               <Picker.Item label="Inactive" value="Inactive" />
+              <Picker.Item label="Completed" value="Completed" />
+              <Picker.Item label="Rejected" value="Rejected" />
             </Picker>
           </View>
         )}
@@ -675,6 +672,10 @@ const AddTaskHazardModal = ({
     }
   };
 
+  if (!taskHazard) {
+    return null;
+  }
+
   return (
     <Modal
       visible={visible}
@@ -689,7 +690,7 @@ const AddTaskHazardModal = ({
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Add Task Hazard Assessment</Text>
+          <Text style={styles.title}>Edit Task Hazard Assessment</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color="#64748b" />
           </TouchableOpacity>
@@ -731,7 +732,7 @@ const AddTaskHazardModal = ({
                 {isLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Create Task Hazard</Text>
+                  <Text style={styles.submitButtonText}>Update Task Hazard</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -859,6 +860,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#111827',
+  },
+  readOnlyInput: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+  },
+  readOnlyText: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   textArea: {
     height: 80,
@@ -1032,4 +1041,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AddTaskHazardModal;
+export default EditTaskHazardModal;

@@ -91,7 +91,7 @@ export async function apiClient(endpoint, options = {}) {
         (data?.message && data.message.toLowerCase().includes('login again'));
         
       if (isAuthError) {
-        console.log('Authentication error detected, triggering logout...');
+        // console.log('Authentication error detected, triggering logout...');
         
         // Clear auth data and navigate to login
         await AsyncStorage.multiRemove(['user', 'authToken']);

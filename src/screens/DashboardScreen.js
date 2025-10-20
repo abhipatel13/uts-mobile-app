@@ -6,15 +6,26 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LocationService from '../services/LocationService';
 
 const DashboardScreen = ({ navigation }) => {
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
   const [locationStatus, setLocationStatus] = useState(null);
+  const [userInfo, setUserInfo] = useState({
+    fullName: '',
+    email: '',
+    role: '',
+    company: '',
+  });
+
+  console.log('userInfo', userInfo);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const onChange = (result) => {
@@ -31,11 +42,29 @@ const DashboardScreen = ({ navigation }) => {
 
   const initializeDashboard = async () => {
     try {
+      setIsLoading(true);
+      
+      // Get user info from AsyncStorage
+      const userData = await AsyncStorage.getItem('user');
+
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        // Ensure we only extract string values, not objects
+        setUserInfo({
+          name: typeof parsedUser.name === 'string' ? parsedUser.name : 'User',
+          email: typeof parsedUser.email === 'string' ? parsedUser.email : '',
+          role: typeof parsedUser.role === 'string' ? parsedUser.role : 'User',
+          company: typeof parsedUser.company === 'string' ? parsedUser.company : 'Utah Technical Services LLC',
+        });
+      }
+      
       // Get location status
       const location = LocationService.getLocationStatus();
       setLocationStatus(location);
     } catch (error) {
       console.error('DashboardScreen: initializeDashboard - Error:', error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -75,13 +104,6 @@ const DashboardScreen = ({ navigation }) => {
   const { width, height } = screenData;
   const isTablet = width >= 768;
   const isSmallScreen = width < 360;
-  
-  const userInfo = {
-    email: 'hello1@utahtechnicalservicesllc.com',
-    role: 'Superuser',
-    accessLevel: 'Licensed',
-    company: 'Utah Technical Services LLC',
-  };
 
   const dashboardCards = [
     {
@@ -155,17 +177,35 @@ const DashboardScreen = ({ navigation }) => {
 
   const dynamicStyles = createDynamicStyles(width, isTablet, isSmallScreen);
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="rgb(52, 73, 94)" />
+          <Text style={styles.loadingText}>Loading Dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Welcome Header */}
       <View style={styles.welcomeContainer}>
-        <Text style={styles.welcomeText} numberOfLines={2} adjustsFontSizeToFit={true}>
-          Welcome back,{'\n'}{userInfo.email}!
-        </Text>
-        <Text style={styles.subtitleText} numberOfLines={2}>
-          Superuser Dashboard - Access your tools and manage your work
-        </Text>
+        <View style={styles.welcomeHeader}>
+          <View style={styles.welcomeIcon}>
+            <Ionicons name="person-circle" size={48} color="rgb(52, 73, 94)" />
+          </View>
+          <View style={styles.welcomeContent}>
+            <Text style={styles.welcomeText} numberOfLines={1}>
+              Hello, {String(userInfo.fullName || 'User')}!
+            </Text>
+            <Text style={styles.subtitleText} numberOfLines={2}>
+              {String(userInfo.role || 'User')} Dashboard - Manage your work efficiently
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* User Info Cards */}
@@ -176,17 +216,17 @@ const DashboardScreen = ({ navigation }) => {
           </View>
           <View style={styles.infoCardContent}>
             <Text style={styles.infoCardLabel}>Role</Text>
-            <Text style={styles.infoCardValue}>{userInfo.role}</Text>
+            <Text style={styles.infoCardValue}>{String(userInfo.role || '')}</Text>
           </View>
         </View>
 
         <View style={styles.infoCard}>
           <View style={styles.infoCardIcon}>
-            <Ionicons name="checkmark-circle-outline" size={24} color="#059669" />
+            <Ionicons name="mail-outline" size={24} color="#059669" />
           </View>
           <View style={styles.infoCardContent}>
-            <Text style={styles.infoCardLabel}>Access Level</Text>
-            <Text style={styles.infoCardValue}>{userInfo.accessLevel}</Text>
+            <Text style={styles.infoCardLabel}>Email</Text>
+            <Text style={styles.infoCardValue} numberOfLines={1}>{String(userInfo.email || '')}</Text>
           </View>
         </View>
 
@@ -196,7 +236,7 @@ const DashboardScreen = ({ navigation }) => {
           </View>
           <View style={styles.infoCardContent}>
             <Text style={styles.infoCardLabel}>Company</Text>
-            <Text style={styles.infoCardValue}>{userInfo.company}</Text>
+            <Text style={styles.infoCardValue}>{String(userInfo.company || '')}</Text>
           </View>
         </View>
       </View>
@@ -311,22 +351,57 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
+    paddingTop: 0,
   },
   welcomeContainer: {
-    padding: 20,
+    padding: 24,
     backgroundColor: '#fff',
     marginBottom: 20,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  welcomeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  welcomeIcon: {
+    marginRight: 16,
+  },
+  welcomeContent: {
+    flex: 1,
   },
   welcomeText: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#1e293b',
-    marginBottom: 8,
-    lineHeight: 28,
+    marginBottom: 4,
+    lineHeight: 32,
   },
   subtitleText: {
     fontSize: 16,
     color: '#64748b',
+    lineHeight: 22,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: '500',
   },
   infoCardsContainer: {
     flexDirection: 'column',
@@ -337,16 +412,18 @@ const styles = StyleSheet.create({
   infoCard: {
     width: '100%',
     backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    minHeight: 70,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    minHeight: 80,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   infoCardHeader: {
     flexDirection: 'row',
@@ -380,16 +457,18 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 16,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   cardIcon: {
     width: 48,

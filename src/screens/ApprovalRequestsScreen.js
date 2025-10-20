@@ -66,7 +66,7 @@ const ApprovalRequestsScreen = () => {
       setApprovalRequests(data.taskHazards || []);
       
       if (isRefresh) {
-        console.log(`Refresh completed successfully. Found ${data.taskHazards?.length || 0} approval requests.`);
+        // console.log(`Refresh completed successfully. Found ${data.taskHazards?.length || 0} approval requests.`);
       }
 
     } catch (error) {

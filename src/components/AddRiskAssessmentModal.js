@@ -18,7 +18,7 @@ import { Picker } from '@react-native-picker/picker';
 import TaskRisksComponent from './TaskRisksComponent';
 import AssetSelector from './AssetSelector';
 import LocationSelector from './LocationSelector';
-import { UserApi } from '../services/UserApi';
+import { UserService } from '../services/UserService';
 
 const AddRiskAssessmentModal = ({ 
   visible, 
@@ -49,7 +49,7 @@ const AddRiskAssessmentModal = ({
   const fetchUsers = async () => {
     try {
       setIsLoadingUsers(true);
-      const response = await UserApi.getAll(); // This calls getAllUserRestricted
+      const response = await UserService.getAll();
       if (response && response.data) {
         setUsers(response.data);
       }
@@ -57,10 +57,9 @@ const AddRiskAssessmentModal = ({
       console.error('AddRiskAssessmentModal: fetchUsers failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
-        console.log('AddRiskAssessmentModal: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
-      } else {
-        Alert.alert('Error', 'Failed to load users. Please try again.');
+      } else if (!error.message?.includes('connect to the internet')) {
+        console.error("Error loading users:", error.message);
       }
     } finally {
       setIsLoadingUsers(false);
@@ -208,22 +207,20 @@ const AddRiskAssessmentModal = ({
       scopeOfWork: formData.scopeOfWork.trim(),
       assetSystem: formData.assetSystem.trim(),
       supervisor: formData.lead.trim(),
-      individuals: formData.assessmentTeam.join(', '),
+      individuals: formData.assessmentTeam, // Keep as array
+      assessmentTeam: formData.assessmentTeam, // Also store as assessmentTeam
       location: formData.location.trim(),
       status: formData.status,
       risks: formData.risks
     };
 
-    console.log('AddRiskAssessmentModal: Submitting risk assessment:', riskAssessmentToCreate);
     try {
       await onSubmit(riskAssessmentToCreate);
-      console.log('AddRiskAssessmentModal: Risk assessment created successfully');
       onClose();
     } catch (error) {
       console.error('AddRiskAssessmentModal: handleSubmit failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
-        console.log('AddRiskAssessmentModal: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
         onClose(); // Close modal since user will be logged out
       } else {

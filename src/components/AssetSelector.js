@@ -13,7 +13,7 @@ import {
   ActionSheetIOS,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AssetHierarchyApi } from '../services/AssetHierarchyApi';
+import { AssetHierarchyService } from '../services/AssetHierarchyService';
 
 const AssetSelector = ({ 
   value, 
@@ -29,11 +29,11 @@ const AssetSelector = ({
   const [searchText, setSearchText] = useState('');
   const [expandedAssets, setExpandedAssets] = useState(new Set());
 
-  // Fetch assets from API
+  // Fetch assets from API or cache
   const fetchAssets = async () => {
     try {
       setIsLoading(true);
-      const response = await AssetHierarchyApi.getAll();
+      const response = await AssetHierarchyService.getAll();
       
       if (!Array.isArray(response.data)) {
         throw new Error('Invalid response format from server');
@@ -47,10 +47,10 @@ const AssetSelector = ({
       console.error('AssetSelector: fetchAssets failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
-        console.log('AssetSelector: Authentication expired, user will be redirected to login');
+        // console.log('AssetSelector: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
-      } else {
-        Alert.alert('Error', 'Failed to load assets. Please try again.');
+      } else if (!error.message?.includes('connect to the internet')) {
+        console.error("Error loading assets:", error.message);
       }
     } finally {
       setIsLoading(false);

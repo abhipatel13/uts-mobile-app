@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -16,43 +16,36 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import TaskRisksComponent from './TaskRisksComponent';
-import SimpleMapView from './SimpleMapView';
 import AssetSelector from './AssetSelector';
-import GeoFenceSettings from './GeoFenceSettings';
 import LocationSelector from './LocationSelector';
 import { UserService } from '../services/UserService';
 
-const AddTaskHazardModal = ({ 
+const EditRiskAssessmentModal = ({ 
   visible, 
   onClose, 
   onSubmit, 
-  isLoading = false 
+  isLoading = false,
+  riskAssessment = null
 }) => {
   const [formData, setFormData] = useState({
     date: '',
     time: '',
     scopeOfWork: '',
     assetSystem: '',
-    systemLockoutRequired: false,
-    trainedWorkforce: false,
-    supervisor: '',
-    individual: '',
+    assessmentTeam: [],
+    lead: '',
     location: '',
     status: 'Pending',
-    geoFenceLimit: '200',
     risks: []
   });
 
   const [errors, setErrors] = useState({});
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
-  const [mapType, setMapType] = useState('standard');
-  const [isMapLoading, setIsMapLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [showGeoFenceSettings, setShowGeoFenceSettings] = useState(false);
 
-  // Fetch users from API or cache
+  // Fetch users from API
   const fetchUsers = async () => {
     try {
       setIsLoadingUsers(true);
@@ -61,7 +54,7 @@ const AddTaskHazardModal = ({
         setUsers(response.data);
       }
     } catch (error) {
-      console.error('AddTaskHazardModal: fetchUsers failed:', error.message);
+      console.error('EditRiskAssessmentModal: fetchUsers failed:', error.message);
       if (!error.message?.includes('connect to the internet')) {
         console.error("Error loading users:", error.message);
       }
@@ -70,26 +63,39 @@ const AddTaskHazardModal = ({
     }
   };
 
-  // Reset form when modal opens/closes
+  // Initialize form data when modal opens or riskAssessment changes
   useEffect(() => {
-    if (!visible) {
-      resetForm();
-    } else {
-      // Set default date and time when modal opens
-      const now = new Date();
-      const dateString = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-      const timeString = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
-      
-      setFormData(prev => ({
-        ...prev,
-        date: dateString,
-        time: timeString
-      }));
+    if (visible && riskAssessment) {
+      setFormData({
+        date: riskAssessment.date || '',
+        time: riskAssessment.time || '',
+        scopeOfWork: riskAssessment.scopeOfWork || '',
+        assetSystem: riskAssessment.assetSystem || '',
+        assessmentTeam: (() => {
+          // Handle both array and string formats
+          if (Array.isArray(riskAssessment.assessmentTeam)) {
+            return riskAssessment.assessmentTeam;
+          } else if (Array.isArray(riskAssessment.individuals)) {
+            return riskAssessment.individuals;
+          } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals.trim()) {
+            return riskAssessment.individuals.split(',').map(email => email.trim());
+          }
+          return [];
+        })(),
+        lead: riskAssessment.lead || riskAssessment.supervisor || '',
+        location: riskAssessment.location || '',
+        status: riskAssessment.status || 'Pending',
+        risks: riskAssessment.risks || []
+      });
+      setCurrentStep(1);
+      setErrors({});
       
       // Fetch users when modal opens
       fetchUsers();
+    } else if (!visible) {
+      resetForm();
     }
-  }, [visible]);
+  }, [visible, riskAssessment]);
 
   const resetForm = () => {
     setFormData({
@@ -97,13 +103,10 @@ const AddTaskHazardModal = ({
       time: '',
       scopeOfWork: '',
       assetSystem: '',
-      systemLockoutRequired: false,
-      trainedWorkforce: false,
-      supervisor: '',
-      individual: '',
+      assessmentTeam: [],
+      lead: '',
       location: '',
       status: 'Pending',
-      geoFenceLimit: '200',
       risks: []
     });
     setErrors({});
@@ -125,72 +128,11 @@ const AddTaskHazardModal = ({
     }
   };
 
-  // Map related functions
-  const handleMapTypeChange = (type) => {
-    setMapType(type);
-  };
-
-  const handleMarkerPress = (location) => {
-    Alert.alert(
-      'Location Details',
-      `Location: ${location.name}\nStatus: ${formData.status}\nRisks: ${formData.risks.length}`,
-      [{ text: 'OK' }]
-    );
-  };
-
-  const getRiskColor = (riskScore) => {
-    if (riskScore >= 17) return '#991b1b'; // Critical - Dark red
-    if (riskScore >= 10) return '#ef4444'; // High - Red
-    if (riskScore >= 5) return '#f59e0b';  // Medium - Orange
-    return '#22c55e'; // Low - Green
-  };
-
-  // Create location data based on form location
-  const getLocationData = () => {
-    if (!formData.location) return [];
-    
-    // Parse coordinates from location string or use default
-    const defaultCoords = { latitude: 40.7128, longitude: -74.0060 }; // NYC default
-    let coords = defaultCoords;
-    
-    // Try to parse if location contains coordinates
-    const coordMatch = formData.location.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
-    if (coordMatch) {
-      coords = {
-        latitude: parseFloat(coordMatch[1]),
-        longitude: parseFloat(coordMatch[2])
-      };
-    }
-
-    // Calculate average risk score from form risks
-    const avgRiskScore = formData.risks.length > 0 
-      ? formData.risks.reduce((sum, risk) => {
-          const asIsScore = (parseInt(risk.asIsLikelihood) || 1) * (parseInt(risk.asIsConsequence) || 1);
-          return sum + asIsScore;
-        }, 0) / formData.risks.length
-      : 1;
-
-    return [{
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      name: formData.location,
-      count: formData.risks.length,
-      riskScore: Math.round(avgRiskScore),
-      status: formData.status
-    }];
-  };
-
   const validateStep = (step) => {
     const newErrors = {};
 
     if (step === 1) {
       // Basic Information validation
-      if (!formData.date) {
-        newErrors.date = 'Date is required';
-      }
-      if (!formData.time) {
-        newErrors.time = 'Time is required';
-      }
       if (!formData.scopeOfWork.trim()) {
         newErrors.scopeOfWork = 'Scope of Work is required';
       }
@@ -198,12 +140,12 @@ const AddTaskHazardModal = ({
         newErrors.location = 'Location is required';
       }
     } else if (step === 2) {
-      // Personnel validation
-      if (!formData.supervisor.trim()) {
-        newErrors.supervisor = 'Supervisor is required';
+      // Team validation
+      if (!formData.lead.trim()) {
+        newErrors.lead = 'Lead assessor is required';
       }
-      if (!formData.individual.trim()) {
-        newErrors.individual = 'At least one individual is required';
+      if (formData.assessmentTeam.length === 0) {
+        newErrors.assessmentTeam = 'At least one team member is required';
       }
     } else if (step === 3) {
       // Risk Assessment validation
@@ -231,42 +173,21 @@ const AddTaskHazardModal = ({
   };
 
   // iOS-friendly picker handlers
-  const showSupervisorPicker = (supervisors) => {
-    if (Platform.OS === 'ios' && supervisors.length > 0) {
-      const options = ['Cancel', ...supervisors.map(user => `${user.name || 'No Name'} (${user.email})`)];
+  const showLeadPicker = (leads) => {
+    if (Platform.OS === 'ios' && leads.length > 0) {
+      const options = ['Cancel', ...leads.map(user => `${user.name || 'No Name'} (${user.email})`)];
       const cancelButtonIndex = 0;
       
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
           cancelButtonIndex,
-          title: 'Select Supervisor',
+          title: 'Select Lead Assessor',
         },
         (buttonIndex) => {
           if (buttonIndex !== cancelButtonIndex) {
-            const selectedSupervisor = supervisors[buttonIndex - 1];
-            handleInputChange('supervisor', selectedSupervisor.email);
-          }
-        }
-      );
-    }
-  };
-
-  const showIndividualPicker = (individuals) => {
-    if (Platform.OS === 'ios' && individuals.length > 0) {
-      const options = ['Cancel', ...individuals.map(user => `${user.name || 'No Name'} (${user.email})`)];
-      const cancelButtonIndex = 0;
-      
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          title: 'Select Individual',
-        },
-        (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            const selectedIndividual = individuals[buttonIndex - 1];
-            handleInputChange('individual', selectedIndividual.email);
+            const selectedLead = leads[buttonIndex - 1];
+            handleInputChange('lead', selectedLead.email);
           }
         }
       );
@@ -275,7 +196,7 @@ const AddTaskHazardModal = ({
 
   const showStatusPicker = () => {
     if (Platform.OS === 'ios') {
-      const options = ['Cancel', 'Pending', 'Active', 'Inactive'];
+      const options = ['Cancel', 'Pending', 'Active', 'Inactive', 'Completed', 'Rejected'];
       const cancelButtonIndex = 0;
       
       ActionSheetIOS.showActionSheetWithOptions(
@@ -295,16 +216,10 @@ const AddTaskHazardModal = ({
   };
 
   // Helper to get display text for selected values
-  const getSupervisorDisplayText = (supervisors) => {
-    if (!formData.supervisor) return 'Select supervisor...';
-    const supervisor = supervisors.find(user => user.email === formData.supervisor);
-    return supervisor ? `${supervisor.name || 'No Name'} (${supervisor.email})` : 'Select supervisor...';
-  };
-
-  const getIndividualDisplayText = (individuals) => {
-    if (!formData.individual) return 'Select individual...';
-    const individual = individuals.find(user => user.email === formData.individual);
-    return individual ? `${individual.name || 'No Name'} (${individual.email})` : 'Select individual...';
+  const getLeadDisplayText = (leads) => {
+    if (!formData.lead) return 'Select lead assessor...';
+    const lead = leads.find(user => user.email === formData.lead);
+    return lead ? `${lead.name || 'No Name'} (${lead.email})` : 'Select lead assessor...';
   };
 
   const nextStep = () => {
@@ -329,27 +244,135 @@ const AddTaskHazardModal = ({
       return;
     }
 
-    const taskHazardToCreate = {
+    const riskAssessmentToUpdate = {
+      id: riskAssessment.id,
       date: formData.date,
       time: formData.time,
       scopeOfWork: formData.scopeOfWork.trim(),
       assetSystem: formData.assetSystem.trim() || null,
-      systemLockoutRequired: formData.systemLockoutRequired,
-      trainedWorkforce: formData.trainedWorkforce,
-      individual: formData.individual.trim(),
-      supervisor: formData.supervisor.trim(),
+      assessmentTeam: formData.assessmentTeam,
+      individuals: formData.assessmentTeam, // Also store as individuals for compatibility
+      lead: formData.lead.trim(),
+      supervisor: formData.lead.trim(), // Map lead to supervisor for API
       location: formData.location.trim(),
       status: formData.status,
-      geoFenceLimit: parseInt(formData.geoFenceLimit) || 200,
       risks: formData.risks
     };
 
     try {
-      await onSubmit(taskHazardToCreate);
-      onClose();
+      await onSubmit(riskAssessmentToUpdate);
+      // Modal closing is handled by parent component
     } catch (error) {
-      console.error('AddTaskHazardModal: handleSubmit failed:', error.message);
+      console.error('EditRiskAssessmentModal: handleSubmit failed:', error.message);
     }
+  };
+
+  // Show team picker for multiple selection
+  const showTeamPicker = () => {
+    if (users.length === 0) {
+      Alert.alert('No Users', 'No users available for selection.');
+      return;
+    }
+
+    // Create a simple alert with options to select/deselect users
+    const currentTeam = formData.assessmentTeam;
+    const userOptions = users.map(user => {
+      const isSelected = currentTeam.includes(user.email);
+      return `${isSelected ? '✓' : '○'} ${user.name} (${user.email})`;
+    });
+    
+    const options = ['Done', ...userOptions];
+    
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: 0,
+          title: 'Select Assessment Team Members',
+          message: 'Tap to toggle selection',
+        },
+        (buttonIndex) => {
+          if (buttonIndex > 0) {
+            const selectedUser = users[buttonIndex - 1];
+            toggleTeamMember(selectedUser.email);
+            // Show the picker again for multiple selections
+            setTimeout(() => showTeamPicker(), 100);
+          }
+        }
+      );
+    } else {
+      // For Android, show a simple alert with the current selection
+      Alert.alert(
+        'Select Assessment Team',
+        'Current selection: ' + getTeamDisplayText(),
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Modify Selection', onPress: () => showAndroidTeamSelector() }
+        ]
+      );
+    }
+  };
+
+  // Android team selector (simplified)
+  const showAndroidTeamSelector = () => {
+    const currentTeam = formData.assessmentTeam;
+    const userButtons = users.map((user, index) => {
+      const isSelected = currentTeam.includes(user.email);
+      return {
+        text: `${isSelected ? '✓' : '○'} ${user.name}`,
+        onPress: () => {
+          toggleTeamMember(user.email);
+          setTimeout(() => showAndroidTeamSelector(), 100);
+        }
+      };
+    });
+
+    Alert.alert(
+      'Select Team Members',
+      'Tap to toggle selection',
+      [
+        ...userButtons,
+        { text: 'Done', style: 'default' }
+      ]
+    );
+  };
+
+  // Toggle team member selection
+  const toggleTeamMember = (userEmail) => {
+    const currentTeam = formData.assessmentTeam;
+    const isSelected = currentTeam.includes(userEmail);
+    
+    let newTeam;
+    if (isSelected) {
+      // Remove user from team
+      newTeam = currentTeam.filter(email => email !== userEmail);
+    } else {
+      // Add user to team
+      newTeam = [...currentTeam, userEmail];
+    }
+    
+    handleInputChange('assessmentTeam', newTeam);
+  };
+
+  // Get display text for selected team members
+  const getTeamDisplayText = () => {
+    if (formData.assessmentTeam.length === 0) {
+      return 'Select Assessment Team';
+    }
+    
+    const selectedUsers = users.filter(user => 
+      formData.assessmentTeam.includes(user.email)
+    );
+    
+    if (selectedUsers.length === 1) {
+      return `${selectedUsers[0].name}`;
+    } else if (selectedUsers.length === 2) {
+      return `${selectedUsers[0].name} and ${selectedUsers[1].name}`;
+    } else if (selectedUsers.length > 2) {
+      return `${selectedUsers[0].name} and ${selectedUsers.length - 1} others`;
+    }
+    
+    return `${formData.assessmentTeam.length} team member${formData.assessmentTeam.length !== 1 ? 's' : ''}`;
   };
 
   const renderStepIndicator = () => (
@@ -369,7 +392,7 @@ const AddTaskHazardModal = ({
             </Text>
           </View>
           <Text style={[styles.stepLabel, currentStep === step && styles.stepLabelActive]}>
-            {step === 1 ? 'Basic Info' : step === 2 ? 'Personnel' : step === 3 ? 'Risks' : 'Risk Status'}
+            {step === 1 ? 'Basic Info' : step === 2 ? 'Team' : step === 3 ? 'Risks' : 'Status'}
           </Text>
         </View>
       ))}
@@ -383,27 +406,21 @@ const AddTaskHazardModal = ({
       contentContainerStyle={styles.scrollContentContainer}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Date and Time */}
+      {/* Date and Time - Read Only */}
       <View style={styles.row}>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>Date *</Text>
-          <TextInput
-            style={[styles.input, errors.date && styles.inputError]}
-            value={formData.date}
-            onChangeText={(value) => handleInputChange('date', value)}
-            placeholder="YYYY-MM-DD"
-          />
-          {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
+          <Text style={styles.label}>Date</Text>
+          <View style={[styles.input, styles.readOnlyInput]}>
+            <Text style={styles.readOnlyText}>{formData.date}</Text>
+          </View>
+          <Text style={styles.helpText}>Original creation date (not editable)</Text>
         </View>
         <View style={styles.halfWidth}>
-          <Text style={styles.label}>Time *</Text>
-          <TextInput
-            style={[styles.input, errors.time && styles.inputError]}
-            value={formData.time}
-            onChangeText={(value) => handleInputChange('time', value)}
-            placeholder="HH:MM"
-          />
-          {errors.time && <Text style={styles.errorText}>{errors.time}</Text>}
+          <Text style={styles.label}>Time</Text>
+          <View style={[styles.input, styles.readOnlyInput]}>
+            <Text style={styles.readOnlyText}>{formData.time}</Text>
+          </View>
+          <Text style={styles.helpText}>Original creation time (not editable)</Text>
         </View>
       </View>
 
@@ -414,7 +431,7 @@ const AddTaskHazardModal = ({
           style={[styles.input, styles.textArea, errors.scopeOfWork && styles.inputError]}
           value={formData.scopeOfWork}
           onChangeText={(value) => handleInputChange('scopeOfWork', value)}
-          placeholder="Describe the work to be performed"
+          placeholder="Describe the scope of work for this risk assessment"
           multiline
           numberOfLines={3}
         />
@@ -427,7 +444,7 @@ const AddTaskHazardModal = ({
         onChange={(value) => handleInputChange('location', value)}
         error={errors.location}
         label="Location"
-        placeholder="Work location or coordinates"
+        placeholder="Assessment location or coordinates"
         required={true}
       />
 
@@ -436,62 +453,17 @@ const AddTaskHazardModal = ({
         value={formData.assetSystem}
         onValueChange={(value) => handleInputChange('assetSystem', value)}
         error={errors.assetSystem}
-        title="Asset or System being worked on"
+        title="Asset or System being assessed"
         placeholder="Select asset or system"
       />
-
-      {/* Geofence Limit */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Geofence Limit</Text>
-        <TouchableOpacity
-          style={styles.geoFenceButton}
-          onPress={() => setShowGeoFenceSettings(true)}
-        >
-          <View style={styles.geoFenceContent}>
-            <Text style={styles.geoFenceLabel}>Configure Geo Fence Limit</Text>
-            <Text style={styles.geoFenceValue}>Current: {formData.geoFenceLimit} Feet</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Checkboxes */}
-      <View style={styles.checkboxSection}>
-        <TouchableOpacity
-          style={styles.checkboxContainer}
-          onPress={() => handleInputChange('systemLockoutRequired', !formData.systemLockoutRequired)}
-        >
-          <View style={[styles.checkbox, formData.systemLockoutRequired && styles.checkboxChecked]}>
-            {formData.systemLockoutRequired && (
-              <Ionicons name="checkmark" size={16} color="#fff" />
-            )}
-          </View>
-          <Text style={styles.checkboxLabel}>System Lockout Required</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.checkboxContainer}
-          onPress={() => handleInputChange('trainedWorkforce', !formData.trainedWorkforce)}
-        >
-          <View style={[styles.checkbox, formData.trainedWorkforce && styles.checkboxChecked]}>
-            {formData.trainedWorkforce && (
-              <Ionicons name="checkmark" size={16} color="#fff" />
-            )}
-          </View>
-          <Text style={styles.checkboxLabel}>Trained Workforce</Text>
-        </TouchableOpacity>
-      </View>
     </ScrollView>
   );
 
-  const renderPersonnel = () => {
-    // Filter supervisors (supervisor, admin, superuser roles)
-    const supervisors = users.filter(user => 
-      ['supervisor'].includes(user.role)
+  const renderTeam = () => {
+    // Filter leads (supervisor, admin, superuser roles)
+    const leads = users.filter(user => 
+      ['supervisor', 'admin', 'superuser'].includes(user.role)
     );
-
-    // All users for individuals
-    const individuals = users;
 
     return (
       <ScrollView 
@@ -500,36 +472,36 @@ const AddTaskHazardModal = ({
         contentContainerStyle={styles.scrollContentContainer}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Supervisor */}
+        {/* Lead Assessor */}
         <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Supervisor Email *</Text>
+          <Text style={styles.label}>Lead Assessor *</Text>
           {isLoadingUsers ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#374151" />
-              <Text style={styles.loadingText}>Loading supervisors...</Text>
+              <Text style={styles.loadingText}>Loading assessors...</Text>
             </View>
           ) : Platform.OS === 'ios' ? (
             <TouchableOpacity
               style={styles.iosPickerButton}
-              onPress={() => showSupervisorPicker(supervisors)}
+              onPress={() => showLeadPicker(leads)}
             >
               <Text style={[
                 styles.iosPickerText, 
-                !formData.supervisor && styles.iosPickerPlaceholder
+                !formData.lead && styles.iosPickerPlaceholder
               ]}>
-                {getSupervisorDisplayText(supervisors)}
+                {getLeadDisplayText(leads)}
               </Text>
               <Ionicons name="chevron-down" size={20} color="#6b7280" />
             </TouchableOpacity>
           ) : (
             <View style={styles.pickerContainer}>
               <Picker
-                selectedValue={formData.supervisor}
-                onValueChange={(value) => handleInputChange('supervisor', value)}
+                selectedValue={formData.lead}
+                onValueChange={(value) => handleInputChange('lead', value)}
                 style={styles.picker}
               >
-                <Picker.Item label="Select supervisor..." value="" />
-                {supervisors.map((user) => (
+                <Picker.Item label="Select lead assessor..." value="" />
+                {leads.map((user) => (
                   <Picker.Item 
                     key={user.id} 
                     label={`${user.name || 'No Name'} (${user.email}) - ${user.role}`} 
@@ -539,57 +511,41 @@ const AddTaskHazardModal = ({
               </Picker>
             </View>
           )}
-          {errors.supervisor && <Text style={styles.errorText}>{errors.supervisor}</Text>}
+          {errors.lead && <Text style={styles.errorText}>{errors.lead}</Text>}
         </View>
 
-        {/* Individuals */}
+        {/* Assessment Team */}
         <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Individual Email *</Text>
-          {isLoadingUsers ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#374151" />
-              <Text style={styles.loadingText}>Loading users...</Text>
-            </View>
-          ) : Platform.OS === 'ios' ? (
+          <Text style={styles.label}>Assessment Team *</Text>
+          <Text style={styles.helpText}>
+            Select multiple team members for this risk assessment
+          </Text>
+          {Platform.OS === 'ios' ? (
             <TouchableOpacity
-              style={styles.iosPickerButton}
-              onPress={() => showIndividualPicker(individuals)}
+              style={[styles.iosPickerButton, errors.assessmentTeam && styles.inputError]}
+              onPress={() => showTeamPicker()}
             >
-              <Text style={[
-                styles.iosPickerText, 
-                !formData.individual && styles.iosPickerPlaceholder
-              ]}>
-                {getIndividualDisplayText(individuals)}
+              <Text style={[styles.iosPickerText, formData.assessmentTeam.length === 0 && styles.placeholderText]}>
+                {getTeamDisplayText()}
               </Text>
               <Ionicons name="chevron-down" size={20} color="#6b7280" />
             </TouchableOpacity>
           ) : (
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.individual}
-                onValueChange={(value) => handleInputChange('individual', value)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select individual..." value="" />
-                {individuals.map((user) => (
-                  <Picker.Item 
-                    key={user.id} 
-                    label={`${user.name || 'No Name'} (${user.email}) - ${user.role}`} 
-                    value={user.email} 
-                  />
-                ))}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              style={[styles.iosPickerButton, errors.assessmentTeam && styles.inputError]}
+              onPress={() => showTeamPicker()}
+            >
+              <Text style={[styles.iosPickerText, formData.assessmentTeam.length === 0 && styles.placeholderText]}>
+                {getTeamDisplayText()}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#6b7280" />
+            </TouchableOpacity>
           )}
-          <Text style={styles.helpText}>
-            Select team member from your company
-          </Text>
-          {errors.individual && <Text style={styles.errorText}>{errors.individual}</Text>}
+          {errors.assessmentTeam && <Text style={styles.errorText}>{errors.assessmentTeam}</Text>}
         </View>
       </ScrollView>
     );
   };
-
 
   const renderRiskAssessment = () => (
     <View style={styles.stepContent}>
@@ -603,7 +559,7 @@ const AddTaskHazardModal = ({
     </View>
   );
 
-  const renderRiskStatus = () => (
+  const renderStatus = () => (
     <ScrollView 
       style={styles.stepContent} 
       showsVerticalScrollIndicator={false}
@@ -612,9 +568,9 @@ const AddTaskHazardModal = ({
     >
       {/* Status */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Risk Status</Text>
+        <Text style={styles.label}>Assessment Status</Text>
         <Text style={styles.helpText}>
-          Select the current status of this task hazard assessment
+          Select the current status of this risk assessment
         </Text>
         {Platform.OS === 'ios' ? (
           <TouchableOpacity
@@ -636,26 +592,12 @@ const AddTaskHazardModal = ({
               <Picker.Item label="Pending" value="Pending" />
               <Picker.Item label="Active" value="Active" />
               <Picker.Item label="Inactive" value="Inactive" />
+              <Picker.Item label="Completed" value="Completed" />
+              <Picker.Item label="Rejected" value="Rejected" />
             </Picker>
           </View>
         )}
         {errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
-      </View>
-
-      {/* Risk Location Map */}
-      <View style={styles.mapSection}>
-        <Text style={styles.label}>Risk Location Overview</Text>
-        <Text style={styles.helpText}>
-          Visual overview of the task hazard location and risk assessment
-        </Text>
-        <SimpleMapView
-          locationData={getLocationData()}
-          mapType={mapType}
-          onMapTypeChange={handleMapTypeChange}
-          onMarkerPress={handleMarkerPress}
-          getRiskColor={getRiskColor}
-          isLoading={isMapLoading}
-        />
       </View>
     </ScrollView>
   );
@@ -665,15 +607,19 @@ const AddTaskHazardModal = ({
       case 1:
         return renderBasicInformation();
       case 2:
-        return renderPersonnel();
+        return renderTeam();
       case 3:
         return renderRiskAssessment();
       case 4:
-        return renderRiskStatus();
+        return renderStatus();
       default:
         return renderBasicInformation();
     }
   };
+
+  if (!riskAssessment) {
+    return null;
+  }
 
   return (
     <Modal
@@ -689,7 +635,7 @@ const AddTaskHazardModal = ({
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Add Task Hazard Assessment</Text>
+          <Text style={styles.title}>Edit Risk Assessment</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color="#64748b" />
           </TouchableOpacity>
@@ -731,22 +677,13 @@ const AddTaskHazardModal = ({
                 {isLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Create Task Hazard</Text>
+                  <Text style={styles.submitButtonText}>Update Assessment</Text>
                 )}
               </TouchableOpacity>
             )}
           </View>
         </View>
       </KeyboardAvoidingView>
-
-      {/* GeoFence Settings Modal */}
-      <GeoFenceSettings
-        visible={showGeoFenceSettings}
-        onClose={() => setShowGeoFenceSettings(false)}
-        value={parseInt(formData.geoFenceLimit) || 200}
-        onValueChange={(value) => handleInputChange('geoFenceLimit', value.toString())}
-        title="Geo Fence Settings"
-      />
     </Modal>
   );
 };
@@ -860,6 +797,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#111827',
   },
+  readOnlyInput: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+  },
+  readOnlyText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
@@ -911,57 +856,20 @@ const styles = StyleSheet.create({
   iosPickerPlaceholder: {
     color: '#9ca3af',
   },
-  geoFenceButton: {
+  teamContainer: {
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#f9fafb',
     minHeight: 50,
-  },
-  geoFenceContent: {
-    flex: 1,
-  },
-  geoFenceLabel: {
-    fontSize: 16,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  geoFenceValue: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  checkboxSection: {
-    marginTop: 8,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    borderRadius: 4,
-    marginRight: 8,
-    alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: {
-    backgroundColor: 'rgb(52, 73, 94)',
-    borderColor: 'rgb(52, 73, 94)',
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
+  teamText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
   footer: {
     paddingHorizontal: 20,
@@ -1012,9 +920,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  mapSection: {
-    marginTop: 20,
-  },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1030,6 +935,24 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 14,
   },
+  iosPickerButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iosPickerText: {
+    fontSize: 16,
+    color: '#374151',
+  },
+  placeholderText: {
+    color: '#9ca3af',
+  },
 });
 
-export default AddTaskHazardModal;
+export default EditRiskAssessmentModal;

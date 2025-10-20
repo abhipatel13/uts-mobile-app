@@ -3,11 +3,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Animated } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from './src/services/AuthService';
 import LocationService from './src/services/LocationService';
 import DatabaseService from './src/services/DatabaseService';
+import { UserService } from './src/services/UserService';
+import { AssetHierarchyService } from './src/services/AssetHierarchyService';
+import RiskAssessmentService from './src/services/RiskAssessmentService';
+import { TaskHazardService } from './src/services/TaskHazardService';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
@@ -237,13 +242,20 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
-      // Initialize database
+      // Initialize database first
       await DatabaseService.initialize();
-      console.log('Database initialized');
+      
+      // Small delay to ensure database is fully ready
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Initialize location service
       await LocationService.initialize();
-      console.log('Location service initialized');
+      
+      // Start auto-sync for risk assessments
+      RiskAssessmentService.startAutoSync();
+
+      // Start auto-sync for task hazards
+      TaskHazardService.startAutoSync();
       
       // Set global logout handler
       setGlobalLogoutHandler(() => {
@@ -273,14 +285,45 @@ export default function App() {
     };
   }, []);
 
+  // Cache initial data for offline use
+  const cacheInitialData = async () => {
+    try {      
+      // Cache users in background (don't block app loading)
+      UserService.getAll().catch(err => {
+        console.log('Could not cache users:', err.message);
+      });
+      
+      // Cache assets in background
+      AssetHierarchyService.getAll().catch(err => {
+        console.log('Could not cache assets:', err.message);
+      });
+      
+      // Cache risk assessments in background
+      RiskAssessmentService.getAll().catch(err => {
+        console.log('Could not cache risk assessments:', err.message);
+      });
+      
+    } catch (error) {
+      console.log('Error caching initial data:', error.message);
+    }
+  };
+
   const checkAuthStatus = async () => {
     try {
+      // Add a small delay to ensure navigation is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Direct check of AsyncStorage
       const user = await AsyncStorage.getItem('user');
       const token = await AsyncStorage.getItem('authToken');
       const authenticated = !!(user && token);
       
       setIsAuthenticated(authenticated);
+
+      // If authenticated, pre-cache essential data for offline use
+      if (authenticated) {
+        cacheInitialData();
+      }
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
@@ -298,16 +341,18 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <StatusBar style="light" backgroundColor="rgb(52, 73, 94)" />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
-          <Stack.Screen name="MainApp" component={MainAppNavigator} />
-        ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
+        <StatusBar style="light" backgroundColor="rgb(52, 73, 94)" />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {isAuthenticated ? (
+            <Stack.Screen name="MainApp" component={MainAppNavigator} />
+          ) : (
+            <Stack.Screen name="Login" component={LoginScreen} />
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 

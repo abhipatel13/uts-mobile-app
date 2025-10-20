@@ -139,10 +139,11 @@ export default function CustomDrawerContent(props) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Ionicons name="business-outline" size={24} color="#fff" />
-          </View>
-          <Text style={styles.logoText}>UTAH TECH</Text>
+          <Image 
+            source={require('../../assets/uts-logo.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
       </View>
 
@@ -264,22 +265,16 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(52, 73, 94, 0.8)',
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#0ea5e9',
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 10,
   },
-  logoText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  logoImage: {
+    width: 160,
+    height: 60,
   },
   menuContainer: {
     flex: 1,

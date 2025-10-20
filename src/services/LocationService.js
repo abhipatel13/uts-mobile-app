@@ -121,7 +121,13 @@ class LocationService {
    */
   stopLocationWatching() {
     if (this.watchId) {
-      this.watchId.remove();
+      this.watchId.then(subscription => {
+        if (subscription && subscription.remove) {
+          subscription.remove();
+        }
+      }).catch(error => {
+        console.error('Error removing location watch:', error);
+      });
       this.watchId = null;
     }
   }

@@ -5,41 +5,29 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from '../services/AuthService';
 import { triggerAuthRefresh } from '../utils/globalHandlers';
+import CustomAlertModal from '../components/CustomAlertModal';
+import { useCustomAlert } from '../hooks/useCustomAlert';
 
 export default function LoginScreen({ navigation }) {
   const [formData, setFormData] = useState({
+    name: '',
     email: '',
     password: '',
     company: '',
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Check if user is already logged in
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const user = await AsyncStorage.getItem('user');
-      const token = await AsyncStorage.getItem('authToken');
-      if (user && token) {
-        navigation.replace('Dashboard');
-      }
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-    }
-  };
+  const { alertState, showAlert, hideAlert, showSuccessAlert, showErrorAlert } = useCustomAlert();
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -93,17 +81,18 @@ export default function LoginScreen({ navigation }) {
 
       const { user, token } = data.data;
 
+      console.log('user', user);
+
       // Store user data and token
       await AsyncStorage.setItem('user', JSON.stringify({
         id: user._id,
         email: user.email,
         name: user.name,
         role: user.role,
-        company: user.company,
+        company: user.company.name || user.company.id,
         isAuthenticated: true,
       }));
       await AsyncStorage.setItem('authToken', token);
-            
       // Trigger immediate auth refresh to navigate to dashboard
       triggerAuthRefresh();
 
@@ -141,10 +130,9 @@ export default function LoginScreen({ navigation }) {
       }
 
       // Show success message
-      Alert.alert(
+      showSuccessAlert(
         'Password Reset Email Sent',
-        `If an account exists for ${formData.email}, we have sent a password reset link. Please check your inbox and spam folder.`,
-        [{ text: 'OK' }]
+        `If an account exists for ${formData.email}, we have sent a password reset link. Please check your inbox and spam folder.`
       );
     } catch (apiError) {
       console.error('Forgot password error:', apiError);
@@ -154,16 +142,58 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  const handleContactAdmin = () => {
+    showAlert({
+      title: 'Contact Administrator',
+      message: 'For technical support, account issues, or login problems, please contact your system administrator.\n\nYou can reach them through your organization\'s IT department or the contact information provided by your company.',
+      buttons: [
+        {
+          text: 'Copy Support Email',
+          primary: true,
+          onPress: () => {
+            const supportEmail = 'info@utahtechnicalservicesllc.com';
+            showAlert({
+              title: 'Support Email',
+              message: `Contact: ${supportEmail}`,
+              type: 'info',
+              buttons: [{ text: 'OK', primary: true }],
+            });
+          }
+        },
+        {
+          text: 'OK',
+          style: 'cancel'
+        }
+      ],
+      type: 'info'
+    });
+  };
+
+  const { width } = Dimensions.get('window');
+
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.loginCard}>
-          {/* Logo/Title */}
-          <Text style={styles.title}>Utah Technical Services LLC</Text>
-          <Text style={styles.subtitle}>Login</Text>
+          {/* Header Section */}
+          <View style={styles.headerSection}>
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require('../../assets/uts-logo.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.subtitle}>Welcome</Text>
+            <Text style={styles.description}>Sign in to your account to continue</Text>
+          </View>
 
           {/* Error Message */}
           {error ? (
@@ -172,73 +202,109 @@ export default function LoginScreen({ navigation }) {
             </View>
           ) : null}
 
-          {/* Form */}
-          <View style={styles.form}>
+          {/* Form Section */}
+          <View style={styles.formSection}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={(value) => handleInputChange('email', value)}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isLoading}
-              />
+              <Text style={styles.label}>Email Address *</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={formData.email}
+                  onChangeText={(value) => handleInputChange('email', value)}
+                  placeholder="Enter your email address"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.password}
-                onChangeText={(value) => handleInputChange('password', value)}
-                placeholder="Enter your password"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isLoading}
-              />
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={formData.password}
+                  onChangeText={(value) => handleInputChange('password', value)}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#9ca3af"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Company</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.company}
-                onChangeText={(value) => handleInputChange('company', value)}
-                placeholder="Enter your company name"
-                autoCapitalize="words"
-                editable={!isLoading}
-              />
+              <Text style={styles.label}>Company Name</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={formData.company}
+                  onChangeText={(value) => handleInputChange('company', value)}
+                  placeholder="Enter your company name (optional)"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="words"
+                  editable={!isLoading}
+                />
+              </View>
             </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={[styles.button, styles.forgotButton]}
-                onPress={handleForgotPassword}
-                disabled={isLoading}
-              >
-                <Text style={styles.forgotButtonText}>Forgot Password</Text>
-              </TouchableOpacity>
+            {/* Forgot Password Link */}
+            <TouchableOpacity
+              style={styles.forgotPasswordContainer}
+              onPress={handleForgotPassword}
+              disabled={isLoading}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.button, styles.loginButton, isLoading && styles.disabledButton]}
-                onPress={handleLogin}
-                disabled={isLoading}
-              >
-                {isLoading ? (
+            {/* Login Button */}
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.disabledButton]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
                   <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.loginButtonText}>Login</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+                  <Text style={styles.loadingText}>Signing in...</Text>
+                </View>
+              ) : (
+                <Text style={styles.loginButtonText}>Sign In</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footerSection}>
+            <TouchableOpacity 
+              style={styles.contactAdminButton}
+              onPress={handleContactAdmin}
+              disabled={isLoading}
+            >
+              <Text style={styles.contactAdminText}>Contact your Administrator</Text>
+            </TouchableOpacity>
+            <Text style={styles.footerText}>
+              Need technical support or account assistance?
+            </Text>
           </View>
         </View>
       </ScrollView>
+
+      {/* Custom Alert Modal */}
+      <CustomAlertModal
+        visible={alertState.visible}
+        onClose={hideAlert}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        type={alertState.type}
+        showCloseButton={alertState.showCloseButton}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -246,107 +312,196 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f8fafc',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 40,
   },
   loginCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 16,
     padding: 32,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
+    maxWidth: 400,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  // Header Section
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 200,
+    height: 80,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
     color: 'rgb(52, 73, 94)',
     marginBottom: 8,
+    letterSpacing: 0.5,
   },
   subtitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     textAlign: 'center',
     color: 'rgb(44, 62, 80)',
-    marginBottom: 24,
+    marginBottom: 8,
   },
+  description: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#6b7280',
+    lineHeight: 22,
+  },
+  // Error Message
   errorContainer: {
-    backgroundColor: '#fee2e2',
-    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
     borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   errorText: {
     color: '#dc2626',
     fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
   },
-  form: {
-    gap: 16,
+  // Form Section
+  formSection: {
+    marginBottom: 24,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     marginBottom: 8,
     color: '#374151',
+    letterSpacing: 0.2,
+  },
+  inputContainer: {
+    position: 'relative',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 6,
-    padding: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#111827',
+    minHeight: 52,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    gap: 12,
+  // Forgot Password
+  forgotPasswordContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 24,
   },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  forgotButton: {
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  forgotButtonText: {
-    color: '#374151',
+  forgotPasswordText: {
+    color: 'rgb(52, 73, 94)',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
+  // Login Button
   loginButton: {
     backgroundColor: 'rgb(52, 73, 94)',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+    shadowColor: 'rgb(52, 73, 94)',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   loginButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
   disabledButton: {
-    opacity: 0.6,
+    opacity: 0.7,
+    shadowOpacity: 0.1,
+  },
+  // Footer Section
+  footerSection: {
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  contactAdminButton: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactAdminText: {
+    color: 'rgb(52, 73, 94)',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  footerText: {
+    color: '#6b7280',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

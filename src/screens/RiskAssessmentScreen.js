@@ -10,8 +10,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RiskAssessmentApi } from '../services';
+import { RiskAssessmentService } from '../services';
 import AddRiskAssessmentModal from '../components/AddRiskAssessmentModal';
+import EditRiskAssessmentModal from '../components/EditRiskAssessmentModal';
 import RiskAssessmentDetailsModal from '../components/RiskAssessmentDetailsModal';
 
 const RiskAssessmentScreen = () => {
@@ -21,14 +22,63 @@ const RiskAssessmentScreen = () => {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreatingRiskAssessment, setIsCreatingRiskAssessment] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isUpdatingRiskAssessment, setIsUpdatingRiskAssessment] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   const [selectedRiskAssessment, setSelectedRiskAssessment] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [dataSource, setDataSource] = useState('api');
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Load risk assessments on component mount
   useEffect(() => {
     fetchRiskAssessments();
+    checkPendingSync();
   }, []);
+
+  const checkPendingSync = async () => {
+    try {
+      const count = await RiskAssessmentService.getPendingCount();
+      setPendingCount(count);
+      if (count > 0) {
+        await syncPendingItems();
+      }
+    } catch (error) {
+      console.error('Error checking pending sync:', error);
+    }
+  };
+
+  const syncPendingItems = async () => {
+    try {
+      const result = await RiskAssessmentService.syncPendingRiskAssessments();
+      if (result.synced > 0) {
+        await fetchRiskAssessments();
+      }
+    } catch (error) {
+      console.error('Error syncing pending items:', error);
+    }
+  };
+
+  // // Manual sync function
+  // const handleManualSync = async () => {
+  //   try {
+  //     setIsSyncing(true);
+  //     const result = await RiskAssessmentService.checkAndSync();
+  //     if (result.synced > 0) {
+  //       Alert.alert('Sync Complete', `Successfully synced ${result.synced} risk assessments to server.`);
+  //       // Refresh the data and check pending count
+  //       await fetchRiskAssessments();
+  //       await checkPendingSync();
+  //     } else {
+  //       Alert.alert('Sync Complete', 'No pending items to sync.');
+  //     }
+  //   } catch (error) {
+  //     console.error('Manual sync error:', error);
+  //     Alert.alert('Sync Error', 'Failed to sync risk assessments. Please try again.');
+  //   } finally {
+  //     setIsSyncing(false);
+  //   }
+  // };
 
   const fetchRiskAssessments = async (isRefresh = false) => {
     try {
@@ -39,8 +89,9 @@ const RiskAssessmentScreen = () => {
       }
       setError(null);
 
-      const response = await RiskAssessmentApi.getAll();
+      const response = await RiskAssessmentService.getAll();
       const apiRiskAssessments = response.data || [];
+      setDataSource(response.source || 'api');
 
       if (!Array.isArray(apiRiskAssessments)) {
         throw new Error('Invalid response format from server');
@@ -49,15 +100,13 @@ const RiskAssessmentScreen = () => {
       setRiskAssessments(apiRiskAssessments);
 
     } catch (error) {
-      console.error('Error fetching risk assessments:', error);
+      console.error("Error loading risk assessments:", error.message);
       setError(error.message || 'Failed to load risk assessments. Please try again.');
       
-      // Show alert for errors
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to load risk assessments. Please try again.',
-        [{ text: 'OK' }]
-      );
+      // Don't show alert if we successfully loaded from cache
+      if (error.message && !error.message.includes('cache')) {
+        console.error("Error loading risk assessments:", error.message);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -71,21 +120,45 @@ const RiskAssessmentScreen = () => {
   const handleCreateRiskAssessment = async (riskAssessmentData) => {
     try {
       setIsCreatingRiskAssessment(true);
+      
+      const response = await RiskAssessmentService.create(riskAssessmentData);
+      
+      setShowAddModal(false);
 
-      console.log('riskAssessmentData', riskAssessmentData);
-      
-      await RiskAssessmentApi.create(riskAssessmentData);
-      
-      // Refresh the risk assessments list
-      await fetchRiskAssessments();
-      
-      Alert.alert('Success', 'Risk Assessment created successfully!');
+      await fetchRiskAssessments(true);
       
     } catch (error) {
-      console.error('Error creating risk assessment:', error);
+      console.error("Error creating risk assessment:", error.message);
       throw error; // Re-throw to let modal handle it
     } finally {
       setIsCreatingRiskAssessment(false);
+    }
+  };
+
+  const handleUpdateRiskAssessment = async (riskAssessmentData) => {
+    try {
+      setIsUpdatingRiskAssessment(true);
+      const response = await RiskAssessmentService.update(riskAssessmentData.id, riskAssessmentData);
+      
+      // Close modal first
+      setShowEditModal(false);
+      setSelectedRiskAssessment(null);
+      
+      // Show success message
+      Alert.alert('Success', 'Risk Assessment updated successfully!');
+      
+      // Refresh the list after a short delay
+      setTimeout(async () => {
+        await fetchRiskAssessments();
+        await checkPendingSync();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error updating risk assessment:', error);
+      Alert.alert('Error', error.message || 'Failed to update risk assessment');
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsUpdatingRiskAssessment(false);
     }
   };
 
@@ -100,7 +173,7 @@ const RiskAssessmentScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await RiskAssessmentApi.delete(riskAssessmentId);
+              await RiskAssessmentService.delete(riskAssessmentId);
               await fetchRiskAssessments();
               Alert.alert('Success', 'Risk Assessment deleted successfully!');
             } catch (error) {
@@ -183,9 +256,17 @@ const RiskAssessmentScreen = () => {
                 </View>
               </View>
               
-              {item.individuals && (
+              {(item.individuals || item.assessmentTeam) && (
                 <Text style={styles.individualsText}>
-                  {item.individuals.split(',').length} individual(s)
+                  {(() => {
+                    const team = item.assessmentTeam || item.individuals;
+                    if (Array.isArray(team)) {
+                      return `${team.length} team member${team.length !== 1 ? 's' : ''}`;
+                    } else if (typeof team === 'string') {
+                      return `${team.split(',').length} team member${team.split(',').length !== 1 ? 's' : ''}`;
+                    }
+                    return '0 team members';
+                  })()}
                 </Text>
               )}
             </View>
@@ -197,6 +278,15 @@ const RiskAssessmentScreen = () => {
               onPress={() => handleRiskAssessmentInfo(item)}
             >
               <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => {
+                setSelectedRiskAssessment(item);
+                setShowEditModal(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color="#3b82f6" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.deleteButton]}
@@ -256,6 +346,26 @@ const RiskAssessmentScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Fixed-height Banner Container to prevent layout jump */}
+      <View style={styles.bannerContainer}>
+        {pendingCount > 0 ? (
+          <View style={styles.pendingBanner}>
+            <Ionicons name="sync-outline" size={16} color="#3b82f6" />
+            <Text style={styles.pendingText}>
+              {pendingCount} risk assessment{pendingCount > 1 ? 's' : ''} pending sync
+            </Text>
+          </View>
+        ) : dataSource === 'cache' ? (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+            <Text style={styles.offlineText}>Offline Mode - Showing cached data</Text>
+          </View>
+        ) : (
+          // Keep height reserved when no banner is shown
+          <View style={styles.bannerSpacer} />
+        )}
+      </View>
+
       {/* Header with View Toggle and Add Button */}
       <View style={styles.header}>
         <View style={styles.headerActions}>
@@ -320,6 +430,15 @@ const RiskAssessmentScreen = () => {
         onClose={() => setShowAddModal(false)}
         onSubmit={handleCreateRiskAssessment}
         isLoading={isCreatingRiskAssessment}
+      />
+
+      {/* Edit Risk Assessment Modal */}
+      <EditRiskAssessmentModal
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSubmit={handleUpdateRiskAssessment}
+        isLoading={isUpdatingRiskAssessment}
+        riskAssessment={selectedRiskAssessment}
       />
 
       {/* Risk Assessment Details Modal */}
@@ -528,6 +647,60 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fbbf24',
+  },
+  offlineText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#92400e',
+    fontWeight: '500',
+  },
+  // Reserve space so banners don't shift layout
+  bannerContainer: {
+    height: 40,
+    justifyContent: 'center',
+  },
+  bannerSpacer: {
+    height: 40,
+  },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#eff6ff',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3b82f6',
+  },
+  pendingText: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#1e40af',
+    fontWeight: '500',
+  },
+  syncButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  syncButtonText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '500',
   },
 });

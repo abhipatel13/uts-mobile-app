@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TaskHazardApi } from '../services';
+import { TaskHazardService } from '../services';
 import TaskHazardMapView from '../components/TaskHazardMapView';
 import TaskHazardDetailsModal from '../components/TaskHazardDetailsModal';
 
@@ -40,6 +40,7 @@ const TaskHazardAnalyticsScreen = () => {
   });
   const [selectedTaskHazard, setSelectedTaskHazard] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [dataSource, setDataSource] = useState('api');
 
   const statusOptions = ['All', 'Active', 'Inactive', 'Pending', 'Completed', 'Rejected'];
 
@@ -56,11 +57,10 @@ const TaskHazardAnalyticsScreen = () => {
   const fetchTaskHazards = async () => {
     try {
       setIsLoading(true);
-      const response = await TaskHazardApi.getAll();
-      console.log('API Response:', response);
+      const response = await TaskHazardService.getAll();
       const data = response.data || [];
-      console.log('Task Hazards data from API:', data);
       setTaskHazards(data);
+      setDataSource(response.source || 'api');
     } catch (error) {
       console.error('Error fetching task hazards:', error);
       Alert.alert('Error', 'Failed to load task hazard data');
@@ -70,14 +70,9 @@ const TaskHazardAnalyticsScreen = () => {
   };
 
   const calculateAnalytics = () => {
-    console.log('TaskHazards data:', taskHazards);
-    console.log('Selected status:', selectedStatus);
-    
     const filteredData = selectedStatus === 'All' 
       ? taskHazards 
       : taskHazards.filter(th => th.status === selectedStatus);
-    
-    console.log('Filtered data:', filteredData);
 
     const statusCounts = {};
     const riskCounts = { low: 0, medium: 0, high: 0, critical: 0 };
@@ -413,6 +408,14 @@ const TaskHazardAnalyticsScreen = () => {
 
   return (
     <View style={styles.container}>
+
+      {/* Offline Mode Banner */}
+      {dataSource === 'cache' && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+          <Text style={styles.offlineText}>Offline Mode - Showing cached data</Text>
+        </View>
+      )}
 
       {/* Search and Filter Controls */}
       <View style={styles.controlsContainer}>
@@ -960,6 +963,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     textAlign: 'center',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef3c7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fbbf24',
+  },
+  offlineText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#92400e',
+    fontWeight: '500',
   },
 });
 

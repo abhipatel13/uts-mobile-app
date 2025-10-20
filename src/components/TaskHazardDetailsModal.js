@@ -26,8 +26,23 @@ const TaskHazardDetailsModal = ({
   if (!taskHazard) return null;
 
   const riskCount = taskHazard.risks?.length || 0;
-  const individualCount = taskHazard.individual ? taskHazard.individual.split(',').length : 0;
-  const individuals = taskHazard.individual ? taskHazard.individual.split(',').map(name => name.trim()) : [];
+  const individualCount = (() => {
+    if (Array.isArray(taskHazard.individual)) {
+      return taskHazard.individual.length;
+    } else if (typeof taskHazard.individual === 'string' && taskHazard.individual.trim()) {
+      return taskHazard.individual.split(',').length;
+    }
+    return 0;
+  })();
+  
+  const individuals = (() => {
+    if (Array.isArray(taskHazard.individual)) {
+      return taskHazard.individual;
+    } else if (typeof taskHazard.individual === 'string' && taskHazard.individual.trim()) {
+      return taskHazard.individual.split(',').map(name => name.trim());
+    }
+    return [];
+  })();
 
   // Calculate highest risk score
   const highestRisk = taskHazard.risks && taskHazard.risks.length > 0

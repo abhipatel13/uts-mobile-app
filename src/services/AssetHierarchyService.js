@@ -64,8 +64,15 @@ export const AssetHierarchyService = {
         // Clear existing assets before caching new ones
         await DatabaseService.executeQuery('DELETE FROM assets');
 
+        // Sort assets by hierarchy level to ensure parents are inserted before children
+        const sortedAssets = [...assets].sort((a, b) => {
+          const levelA = a.level || 0;
+          const levelB = b.level || 0;
+          return levelA - levelB;
+        });
+
         // Insert all assets
-        for (const asset of assets) {
+        for (const asset of sortedAssets) {
           const assetData = {
             id: asset._id || asset.id,
             name: asset.name || 'Unnamed Asset',
@@ -93,6 +100,28 @@ export const AssetHierarchyService = {
             // If insert fails (duplicate), try update
             if (insertError.message.includes('UNIQUE constraint failed')) {
               await DatabaseService.update('assets', assetData.id, assetData);
+            } else if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
+              // If foreign key constraint fails, create a placeholder parent
+              const parentExists = await DatabaseService.getById('assets', assetData.parent_id);
+              if (!parentExists) {
+                const parentData = {
+                  id: assetData.parent_id,
+                  name: 'Parent Asset (Placeholder)',
+                  type: 'Unknown',
+                  parent_id: null,
+                  hierarchy_path: '',
+                  metadata: JSON.stringify({ placeholder: true }),
+                  synced: 1
+                };
+                await DatabaseService.insert('assets', parentData);
+                
+                // Now try to insert the original asset again
+                try {
+                  await DatabaseService.insert('assets', assetData);
+                } catch (retryError) {
+                  console.error('Error inserting asset after parent creation:', assetData.id, retryError);
+                }
+              }
             } else {
               console.error('Error inserting asset:', insertError);
             }

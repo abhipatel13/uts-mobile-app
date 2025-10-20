@@ -39,12 +39,16 @@ class DatabaseService {
       await this.db.execAsync(`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
-          email TEXT NOT NULL UNIQUE,
-          name TEXT NOT NULL,
+          username TEXT,
+          email TEXT,
+          name TEXT,
+          full_name TEXT,
           role TEXT,
           company TEXT,
+          metadata TEXT,
           created_at INTEGER DEFAULT (strftime('%s', 'now')),
-          updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+          updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+          synced INTEGER DEFAULT 1
         );
       `);
 
@@ -88,9 +92,10 @@ class DatabaseService {
       await this.db.execAsync(`
         CREATE TABLE IF NOT EXISTS risk_assessments (
           id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
+          title TEXT,
           location TEXT,
           date TEXT,
+          time TEXT,
           assessor TEXT,
           risks TEXT,
           controls TEXT,
@@ -98,6 +103,7 @@ class DatabaseService {
           likelihood TEXT,
           status TEXT DEFAULT 'draft',
           created_by TEXT,
+          metadata TEXT,
           created_at INTEGER DEFAULT (strftime('%s', 'now')),
           updated_at INTEGER DEFAULT (strftime('%s', 'now')),
           synced INTEGER DEFAULT 0
@@ -137,33 +143,127 @@ class DatabaseService {
    * Run database migrations to add new columns to existing tables
    */
   async runMigrations() {
-    try {      
-      // Add metadata column to task_hazards if it doesn't exist
-      try {
-        await this.db.execAsync(`
-          ALTER TABLE task_hazards ADD COLUMN metadata TEXT;
-        `);
-      } catch (error) {
-        // Column might already exist, ignore error
-        if (!error.message.includes('duplicate column')) {
-          console.log('Metadata column already exists in task_hazards or migration not needed');
-        } 
-      }
-
-      // Add metadata column to risk_assessments if it doesn't exist
-      try {
-        await this.db.execAsync(`
-          ALTER TABLE risk_assessments ADD COLUMN metadata TEXT;
-        `);
-      } catch (error) {
-        // Column might already exist, ignore error
-        if (!error.message.includes('duplicate column')) {
-          console.log('Metadata column already exists in risk_assessments or migration not needed');
+    try {
+      
+      // Check and add time column to risk_assessments
+      const hasTimeColumn = await this.columnExists('risk_assessments', 'time');
+      if (!hasTimeColumn) {
+        try {
+          await this.executeQuery('ALTER TABLE risk_assessments ADD COLUMN time TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+          } else {
+            throw error;
+          }
         }
       }
+
+      // Check and add metadata column to risk_assessments
+      const hasRiskMetadataColumn = await this.columnExists('risk_assessments', 'metadata');
+      if (!hasRiskMetadataColumn) {
+        try {
+          await this.executeQuery('ALTER TABLE risk_assessments ADD COLUMN metadata TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // console.log('Metadata column already exists, skipping...');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Check and add metadata column to task_hazards
+      const hasTaskMetadataColumn = await this.columnExists('task_hazards', 'metadata');
+      if (!hasTaskMetadataColumn) {
+        // console.log('Adding metadata column to task_hazards');
+        try {
+          await this.executeQuery('ALTER TABLE task_hazards ADD COLUMN metadata TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // console.log('Metadata column already exists, skipping...');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Check and add username column to users
+      const hasUsernameColumn = await this.columnExists('users', 'username');
+      if (!hasUsernameColumn) {
+        // console.log('Adding username column to users');
+        try {
+          await this.executeQuery('ALTER TABLE users ADD COLUMN username TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // console.log('Username column already exists, skipping...');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Check and add full_name column to users
+      const hasFullNameColumn = await this.columnExists('users', 'full_name');
+      if (!hasFullNameColumn) {
+        // console.log('Adding full_name column to users');
+        try {
+          await this.executeQuery('ALTER TABLE users ADD COLUMN full_name TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // console.log('Full_name column already exists, skipping...');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Check and add metadata column to users
+      const hasUserMetadataColumn = await this.columnExists('users', 'metadata');
+      if (!hasUserMetadataColumn) {
+        // console.log('Adding metadata column to users');
+        try {
+          await this.executeQuery('ALTER TABLE users ADD COLUMN metadata TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // console.log('Metadata column already exists, skipping...');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Check and add synced column to users
+      const hasUserSyncedColumn = await this.columnExists('users', 'synced');
+      if (!hasUserSyncedColumn) {
+        // console.log('Adding synced column to users');
+        try {
+          await this.executeQuery('ALTER TABLE users ADD COLUMN synced INTEGER DEFAULT 1');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // console.log('Synced column already exists, skipping...');
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // console.log('Database migrations completed successfully');
     } catch (error) {
       console.error('Error running migrations:', error);
-      // Don't throw - migrations are optional upgrades
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a column exists in a table
+   */
+  async columnExists(tableName, columnName) {
+    try {
+      const result = await this.db.getAllAsync(`PRAGMA table_info(${tableName})`);
+      return result.some(column => column.name === columnName);
+    } catch (error) {
+      console.error(`Error checking if column ${columnName} exists in ${tableName}:`, error);
+      return false;
     }
   }
 
@@ -175,9 +275,15 @@ class DatabaseService {
       if (!this.db) {
         throw new Error('Database not initialized');
       }
-      return await this.db.runAsync(sql, params);
+      
+      // Validate params - ensure no undefined values
+      const cleanParams = params.map(p => p === undefined ? null : p);
+      
+      return await this.db.runAsync(sql, cleanParams);
     } catch (error) {
       console.error('Error executing query:', error);
+      console.error('SQL:', sql);
+      console.error('Params:', params);
       throw error;
     }
   }
@@ -202,8 +308,26 @@ class DatabaseService {
    */
   async insert(table, data) {
     try {
-      const keys = Object.keys(data);
-      const values = Object.values(data);
+      // Filter out undefined values and convert objects to strings
+      const cleanData = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined) {
+          // If value is an object (but not null), convert to JSON string
+          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            cleanData[key] = JSON.stringify(value);
+          } else {
+            cleanData[key] = value;
+          }
+        }
+      }
+      
+      const keys = Object.keys(cleanData);
+      const values = Object.values(cleanData);
+      
+      if (keys.length === 0) {
+        throw new Error('No valid data to insert');
+      }
+      
       const placeholders = keys.map(() => '?').join(', ');
       
       const sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`;
@@ -212,6 +336,7 @@ class DatabaseService {
       return result.lastInsertRowId;
     } catch (error) {
       console.error(`Error inserting into ${table}:`, error);
+      console.error('Data:', JSON.stringify(data, null, 2));
       throw error;
     }
   }
@@ -221,8 +346,27 @@ class DatabaseService {
    */
   async update(table, id, data) {
     try {
-      const keys = Object.keys(data);
-      const values = Object.values(data);
+      // Filter out undefined values and convert objects to strings
+      const cleanData = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined && key !== 'id') {
+          // If value is an object (but not null), convert to JSON string
+          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+            cleanData[key] = JSON.stringify(value);
+          } else {
+            cleanData[key] = value;
+          }
+        }
+      }
+      
+      const keys = Object.keys(cleanData);
+      const values = Object.values(cleanData);
+      
+      if (keys.length === 0) {
+        console.warn('No valid data to update');
+        return true;
+      }
+      
       const setClause = keys.map(key => `${key} = ?`).join(', ');
       
       const sql = `UPDATE ${table} SET ${setClause}, updated_at = strftime('%s', 'now') WHERE id = ?`;

@@ -160,17 +160,17 @@ class SyncService {
   async syncRiskAssessment(operation, riskAssessmentId, data) {
     switch (operation) {
       case 'create':
-        const created = await RiskAssessmentApi.createRiskAssessment(data);
+        const created = await RiskAssessmentApi.create(data);
         await DatabaseService.update('risk_assessments', riskAssessmentId, { synced: 1 });
         return created;
       
       case 'update':
-        const updated = await RiskAssessmentApi.updateRiskAssessment(riskAssessmentId, data);
+        const updated = await RiskAssessmentApi.update(riskAssessmentId, data);
         await DatabaseService.update('risk_assessments', riskAssessmentId, { synced: 1 });
         return updated;
       
       case 'delete':
-        await RiskAssessmentApi.deleteRiskAssessment(riskAssessmentId);
+        await RiskAssessmentApi.delete(riskAssessmentId);
         await DatabaseService.delete('risk_assessments', riskAssessmentId);
         return;
       
@@ -184,27 +184,79 @@ class SyncService {
    */
   async cacheAssets(assets) {
     try {
-      for (const asset of assets) {
-        const existing = await DatabaseService.getById('assets', asset._id || asset.id);
-        
-        const assetData = {
-          id: asset._id || asset.id,
-          name: asset.name,
-          type: asset.type,
-          parent_id: asset.parentId || asset.parent_id,
-          hierarchy_path: asset.hierarchyPath || asset.hierarchy_path,
-          metadata: JSON.stringify(asset.metadata || {}),
-          synced: 1
-        };
+      if (!Array.isArray(assets) || assets.length === 0) {
+        return;
+      }
 
-        if (existing) {
-          await DatabaseService.update('assets', assetData.id, assetData);
-        } else {
-          await DatabaseService.insert('assets', assetData);
+      // Temporarily disable foreign key constraints to avoid insertion order issues
+      await DatabaseService.executeQuery('PRAGMA foreign_keys = OFF');
+
+      try {
+        for (const asset of assets) {
+          const existing = await DatabaseService.getById('assets', asset._id || asset.id);
+          
+          const assetData = {
+            id: asset._id || asset.id,
+            name: asset.name || 'Unnamed Asset',
+            type: asset.type || 'Unknown',
+            parent_id: asset.parentId || asset.parent_id || null,
+            hierarchy_path: asset.hierarchyPath || asset.hierarchy_path || '',
+            metadata: JSON.stringify(asset.metadata || {}),
+            synced: 1
+          };
+
+          try {
+            if (existing) {
+              await DatabaseService.update('assets', assetData.id, assetData);
+            } else {
+              await DatabaseService.insert('assets', assetData);
+            }
+          } catch (insertError) {
+            // If insert fails due to foreign key constraint, try to insert parent first
+            if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
+              // Check if parent exists, if not, create a placeholder
+              const parentExists = await DatabaseService.getById('assets', assetData.parent_id);
+              if (!parentExists) {
+                // Create a placeholder parent asset
+                const parentData = {
+                  id: assetData.parent_id,
+                  name: 'Parent Asset (Placeholder)',
+                  type: 'Unknown',
+                  parent_id: null,
+                  hierarchy_path: '',
+                  metadata: JSON.stringify({ placeholder: true }),
+                  synced: 1
+                };
+                await DatabaseService.insert('assets', parentData);
+              }
+              
+              // Now try to insert the original asset
+              try {
+                if (existing) {
+                  await DatabaseService.update('assets', assetData.id, assetData);
+                } else {
+                  await DatabaseService.insert('assets', assetData);
+                }
+              } catch (retryError) {
+                console.error('Error inserting asset after parent creation:', assetData.id, retryError);
+              }
+            } else {
+              console.error('Error inserting asset:', assetData.id, insertError);
+            }
+          }
         }
+      } finally {
+        // Re-enable foreign key constraints
+        await DatabaseService.executeQuery('PRAGMA foreign_keys = ON');
       }
     } catch (error) {
       console.error('Error caching assets:', error);
+      // Re-enable foreign key constraints even if there was an error
+      try {
+        await DatabaseService.executeQuery('PRAGMA foreign_keys = ON');
+      } catch (fkError) {
+        console.error('Error re-enabling foreign key constraints:', fkError);
+      }
       throw error;
     }
   }

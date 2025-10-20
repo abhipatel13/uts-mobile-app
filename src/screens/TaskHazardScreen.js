@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardService } from '../services/TaskHazardService';
 import AddTaskHazardModal from '../components/AddTaskHazardModal';
+import EditTaskHazardModal from '../components/EditTaskHazardModal';
 import TaskHazardDetailsModal from '../components/TaskHazardDetailsModal';
 import TaskHazardMapView from '../components/TaskHazardMapView';
 
@@ -25,13 +26,76 @@ const TaskHazardScreen = () => {
   const [isCreatingTaskHazard, setIsCreatingTaskHazard] = useState(false);
   const [selectedTaskHazard, setSelectedTaskHazard] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isUpdatingTaskHazard, setIsUpdatingTaskHazard] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   const [dataSource, setDataSource] = useState('api'); // 'api' or 'cache'
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Load task hazards on component mount
   useEffect(() => {
     fetchTaskHazards();
+    checkPendingSync();
   }, []);
+
+  // Check and sync pending task hazards
+  const checkPendingSync = async () => {
+    try {
+      const count = await TaskHazardService.getPendingCount();
+      setPendingCount(count);
+      
+      // If there are pending items and we're online, try to sync
+      if (count > 0) {
+        await syncPendingItems();
+      }
+    } catch (error) {
+      console.error('Error checking pending sync:', error);
+    }
+  };
+
+  const syncPendingItems = async () => {
+    try {
+      const result = await TaskHazardService.syncPendingTaskHazards();
+      
+      if (result.offline) {
+        // Device is offline, keep pending items as is
+        return;
+      }
+      
+      if (result.synced > 0) {
+        // Refresh the list after sync
+        await fetchTaskHazards();
+        // Update pending count
+        const newCount = await TaskHazardService.getPendingCount();
+        setPendingCount(newCount);
+      }
+    } catch (error) {
+      console.error('Error syncing pending items:', error);
+    }
+  };
+
+  // Manual sync function
+  const handleManualSync = async () => {
+    try {
+      setIsSyncing(true);
+      const result = await TaskHazardService.checkAndSync();
+      
+      if (result.synced > 0) {
+        Alert.alert('Success', `Successfully synced ${result.synced} task hazard${result.synced > 1 ? 's' : ''}`);
+        // Refresh the list and pending count
+        await fetchTaskHazards();
+        await checkPendingSync();
+      } else {
+        Alert.alert('Info', result.message || 'No pending items to sync');
+      }
+    } catch (error) {
+      console.error('Error in manual sync:', error);
+      Alert.alert('Error', 'Failed to sync task hazards');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const fetchTaskHazards = async (isRefresh = false) => {
     try {
@@ -50,7 +114,21 @@ const TaskHazardScreen = () => {
         throw new Error('Invalid response format');
       }
 
-      setTaskHazards(apiTaskHazards);
+      // Filter out deleted items from display
+      const activeTaskHazards = apiTaskHazards.filter(item => {
+        const status = item.status?.toLowerCase();
+        return status !== 'deleted' && status !== 'removed';
+      });
+
+      console.log('Total task hazards from service:', apiTaskHazards.length);
+      console.log('Active task hazards after filtering:', activeTaskHazards.length);
+      console.log('All task hazard statuses:', apiTaskHazards.map(item => ({ id: item.id, status: item.status })));
+      console.log('Deleted items found:', apiTaskHazards.filter(item => {
+        const status = item.status?.toLowerCase();
+        return status === 'deleted' || status === 'removed';
+      }).length);
+
+      setTaskHazards(activeTaskHazards);
       setDataSource(response.source); // 'api' or 'cache'
     } catch (error) {
       console.error('Error fetching task hazards:', error);
@@ -61,22 +139,40 @@ const TaskHazardScreen = () => {
     }
   };
 
-  const handleRefresh = () => {
-    fetchTaskHazards(true);
+  const handleRefresh = async () => {
+    await fetchTaskHazards(true);
+    // Try to sync pending items when user refreshes
+    await checkPendingSync();
   };
 
   const handleCreateTaskHazard = async (taskHazardData) => {
     try {
-      setIsCreatingTaskHazard(true);
+      setIsCreatingTaskHazard(true);      
+      const response = await TaskHazardService.create(taskHazardData);
+      
+      // Show appropriate message based on whether it was saved offline or online
+      if (response.data?._offline || response.data?._pendingSync) {
+        Alert.alert(
+          'Saved Offline',
+          'Task Hazard saved locally. It will be synced to the server when you\'re back online.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Success', 'Task Hazard created successfully!');
+      }
 
-      console.log('taskHazardData', taskHazardData);
+      // Refresh UI in the background (don't await to avoid blocking)
+      fetchTaskHazards().catch(err => console.error('Error refreshing list:', err.message));
       
-      await TaskHazardService.create(taskHazardData);
-      
-      // Refresh the task hazards list
-      await fetchTaskHazards();
-      
-      Alert.alert('Success', 'Task Hazard created successfully!');
+      if (response.data?._offline || response.data?._pendingSync) {
+        // Update pending count without trying to sync
+        TaskHazardService.getPendingCount()
+          .then(count => setPendingCount(count))
+          .catch(err => console.error('Error getting pending count:', err.message));
+      } else {
+        // Only try to sync if we're online (successful server creation)
+        checkPendingSync().catch(err => console.error('Error checking pending sync:', err.message));
+      }
       
     } catch (error) {
       console.error('Error creating task hazard:', error);
@@ -84,6 +180,46 @@ const TaskHazardScreen = () => {
     } finally {
       setIsCreatingTaskHazard(false);
     }
+  };
+
+  const handleUpdateTaskHazard = async (taskHazardData) => {
+    try {
+      setIsUpdatingTaskHazard(true);
+      const response = await TaskHazardService.update(taskHazardData.id, taskHazardData);
+      
+      // Close modal first
+      setShowEditModal(false);
+      setSelectedTaskHazard(null);
+      
+      // Show appropriate message based on whether it was saved offline or online
+      if (response.data?._offline || response.data?._pendingSync) {
+        Alert.alert(
+          'Updated Offline',
+          'Task Hazard updated locally. It will be synced to the server when you\'re back online.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Success', 'Task Hazard updated successfully!');
+      }
+      
+      // Refresh the list after a short delay
+      setTimeout(async () => {
+        await fetchTaskHazards();
+        await checkPendingSync();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error updating task hazard:', error);
+      Alert.alert('Error', error.message || 'Failed to update task hazard');
+      throw error; // Re-throw to let modal handle it
+    } finally {
+      setIsUpdatingTaskHazard(false);
+    }
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setSelectedTaskHazard(null);
   };
 
   const handleDeleteTaskHazard = async (taskHazardId) => {
@@ -97,11 +233,29 @@ const TaskHazardScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await TaskHazardService.delete(taskHazardId);
+              // Optimistically remove from UI immediately
+              setTaskHazards(prev => prev.filter(item => item.id !== taskHazardId));
+              
+              const response = await TaskHazardService.delete(taskHazardId);
+              
+              // Refresh the UI to ensure consistency
               await fetchTaskHazards();
-              Alert.alert('Success', 'Task Hazard deleted successfully!');
+              await checkPendingSync();
+              
+              // Show appropriate message based on whether it was deleted offline or online
+              if (response.data?._offline || response.data?._pendingSync) {
+                Alert.alert(
+                  'Deleted Offline',
+                  'Task Hazard deleted locally. It will be synced to the server when you\'re back online.',
+                  [{ text: 'OK' }]
+                );
+              } else {
+                Alert.alert('Success', 'Task Hazard deleted successfully!');
+              }
             } catch (error) {
               console.error('Error deleting task hazard:', error);
+              // If error, refresh to restore the item
+              await fetchTaskHazards();
               Alert.alert('Error', error.message || 'Failed to delete task hazard');
             }
           }
@@ -146,9 +300,17 @@ const TaskHazardScreen = () => {
               </View>
             </View>
             
-            <Text style={styles.scopeOfWork} numberOfLines={2}>
-              {item.scopeOfWork}
-            </Text>
+            <View style={styles.scopeOfWorkContainer}>
+              <Text style={styles.scopeOfWork} numberOfLines={2}>
+                {item.scopeOfWork}
+              </Text>
+              {(item._offline || item._pendingSync || item.id?.toString().startsWith('temp_')) && (
+                <View style={styles.pendingBadge}>
+                  <Ionicons name="sync-outline" size={10} color="#3b82f6" />
+                  <Text style={styles.pendingBadgeText}>Pending</Text>
+                </View>
+              )}
+            </View>
             
             <View style={styles.taskHazardDetails}>
               <View style={styles.detailRow}>
@@ -170,7 +332,14 @@ const TaskHazardScreen = () => {
             <View style={styles.riskAndIndividuals}>
               {item.individual && (
                 <Text style={styles.individualsText}>
-                  {item.individual.split(',').length} individual(s)
+                  {(() => {
+                    if (Array.isArray(item.individual)) {
+                      return `${item.individual.length} individual${item.individual.length !== 1 ? 's' : ''}`;
+                    } else if (typeof item.individual === 'string' && item.individual.trim()) {
+                      return `${item.individual.split(',').length} individual${item.individual.split(',').length !== 1 ? 's' : ''}`;
+                    }
+                    return '0 individuals';
+                  })()}
                 </Text>
               )}
             </View>
@@ -182,6 +351,15 @@ const TaskHazardScreen = () => {
               onPress={() => handleTaskHazardInfo(item)}
             >
               <Ionicons name="information-circle-outline" size={20} color="#64748b" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => {
+                setSelectedTaskHazard(item);
+                setShowEditModal(true);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color="#3b82f6" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.deleteButton]}
@@ -248,6 +426,27 @@ const TaskHazardScreen = () => {
           <Text style={styles.offlineBannerText}>
             Offline Mode - Showing cached data
           </Text>
+        </View>
+      )}
+
+      {/* Pending Sync Indicator */}
+      {pendingCount > 0 && (
+        <View style={styles.pendingSyncBanner}>
+          <Ionicons name="sync-circle-outline" size={16} color="#3b82f6" />
+          <Text style={styles.pendingSyncBannerText}>
+            {pendingCount} task hazard{pendingCount > 1 ? 's' : ''} pending sync
+          </Text>
+          <TouchableOpacity 
+            style={styles.syncButton}
+            onPress={handleManualSync}
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.syncButtonText}>Sync Now</Text>
+            )}
+          </TouchableOpacity>
         </View>
       )}
 
@@ -340,6 +539,15 @@ const TaskHazardScreen = () => {
         isLoading={isCreatingTaskHazard}
       />
 
+      {/* Edit Task Hazard Modal */}
+      <EditTaskHazardModal
+        visible={showEditModal}
+        onClose={closeEditModal}
+        onSubmit={handleUpdateTaskHazard}
+        isLoading={isUpdatingTaskHazard}
+        taskHazard={selectedTaskHazard}
+      />
+
       {/* Task Hazard Details Modal */}
       <TaskHazardDetailsModal
         visible={showDetailsModal}
@@ -371,6 +579,36 @@ const styles = StyleSheet.create({
   offlineBannerText: {
     fontSize: 13,
     color: '#92400e',
+    fontWeight: '500',
+  },
+  pendingSyncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#dbeafe',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#93c5fd',
+  },
+  pendingSyncBannerText: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: 13,
+    color: '#1e40af',
+    fontWeight: '500',
+  },
+  syncButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  syncButtonText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '500',
   },
   header: {
@@ -468,12 +706,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  scopeOfWorkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 8,
+  },
   scopeOfWork: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
-    marginBottom: 8,
     lineHeight: 22,
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  pendingBadgeText: {
+    fontSize: 10,
+    color: '#1e40af',
+    fontWeight: '600',
   },
   taskHazardDetails: {
     marginBottom: 8,

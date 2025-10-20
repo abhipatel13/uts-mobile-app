@@ -22,7 +22,7 @@ try {
   Marker = Maps.Marker;
   PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
 } catch (error) {
-  console.log('LocationSelector: Maps import failed:', error.message);
+  // console.log('LocationSelector: Maps import failed:', error.message);
 }
 
 const { width, height } = Dimensions.get('window');

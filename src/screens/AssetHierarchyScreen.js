@@ -168,7 +168,7 @@ const AssetHierarchyScreen = () => {
   };
 
   const handleAssetInfo = (asset) => {
-    console.log('AssetHierarchyScreen: handleAssetInfo - Showing details for asset:', asset.name);
+    // console.log('AssetHierarchyScreen: handleAssetInfo - Showing details for asset:', asset.name);
     setSelectedAsset(asset);
     setShowDetailsModal(true);
   };

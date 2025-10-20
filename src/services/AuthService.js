@@ -60,10 +60,10 @@ export const AuthService = {
     try {
       const user = await AsyncStorage.getItem('user');
       const token = await AsyncStorage.getItem('authToken');
-      console.log('AuthService.isAuthenticated - user exists:', !!user);
-      console.log('AuthService.isAuthenticated - token exists:', !!token);
+      // console.log('AuthService.isAuthenticated - user exists:', !!user);
+      // console.log('AuthService.isAuthenticated - token exists:', !!token);
       const authenticated = !!(user && token);
-      console.log('AuthService.isAuthenticated - result:', authenticated);
+      // console.log('AuthService.isAuthenticated - result:', authenticated);
       return authenticated;
     } catch (error) {
       console.error('AuthService.isAuthenticated error:', error);
