@@ -2,7 +2,7 @@ import React, { useState, useEffect, createRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Animated } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Animated, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -242,19 +242,27 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
+      console.log('Starting app initialization...');
+      
       // Initialize database first
+      console.log('Initializing database...');
       await DatabaseService.initialize();
       
-      // Small delay to ensure database is fully ready
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for database to be fully ready
+      console.log('Waiting for database to be ready...');
+      await DatabaseService.waitForDatabaseReady();
+      console.log('Database is ready!');
       
       // Initialize location service
+      console.log('Initializing location service...');
       await LocationService.initialize();
       
       // Start auto-sync for risk assessments
+      console.log('Starting risk assessment auto-sync...');
       RiskAssessmentService.startAutoSync();
 
       // Start auto-sync for task hazards
+      console.log('Starting task hazard auto-sync...');
       TaskHazardService.startAutoSync();
       
       // Set global logout handler
@@ -268,10 +276,19 @@ export default function App() {
       });
       
       // Check authentication status
+      console.log('Checking authentication status...');
       await checkAuthStatus();
+      
+      console.log('App initialization completed successfully!');
       
     } catch (error) {
       console.error('App initialization failed:', error);
+      // Show error to user
+      Alert.alert(
+        'Initialization Error',
+        'Failed to initialize the app. Please restart the application.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsLoading(false);
     }

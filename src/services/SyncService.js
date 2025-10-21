@@ -205,15 +205,53 @@ class SyncService {
             synced: 1
           };
 
-          try {
-            if (existing) {
-              await DatabaseService.update('assets', assetData.id, assetData);
-            } else {
-              await DatabaseService.insert('assets', assetData);
+          // Check if parent exists in our asset list or database, if not, set parent_id to null
+          if (assetData.parent_id) {
+            const parentExistsInBatch = assets.some(a => (a._id || a.id) === assetData.parent_id);
+            let parentExistsInDatabase = false;
+            
+            if (!parentExistsInBatch) {
+              try {
+                const parentInDb = await DatabaseService.getById('assets', assetData.parent_id);
+                parentExistsInDatabase = !!parentInDb;
+              } catch (error) {
+                console.log(`Error checking parent in database: ${error.message}`);
+                parentExistsInDatabase = false;
+              }
             }
+            
+            if (!parentExistsInBatch && !parentExistsInDatabase) {
+              console.log(`Parent asset ${assetData.parent_id} not found in batch or database, setting parent_id to null for ${assetData.id}`);
+              assetData.parent_id = null;
+            }
+          }
+
+          try {
+            // Use INSERT OR REPLACE to handle both UNIQUE and FOREIGN KEY constraints
+            await DatabaseService.executeQuery(`
+              INSERT OR REPLACE INTO assets 
+              (id, name, type, parent_id, hierarchy_path, metadata, synced, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              assetData.id,
+              assetData.name,
+              assetData.type,
+              assetData.parent_id,
+              assetData.hierarchy_path,
+              assetData.metadata,
+              assetData.synced,
+              Math.floor(Date.now() / 1000),
+              Math.floor(Date.now() / 1000)
+            ]);
           } catch (insertError) {
-            // If insert fails due to foreign key constraint, try to insert parent first
-            if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
+            // Handle UNIQUE constraint failures
+            if (insertError.message.includes('UNIQUE constraint failed')) {
+              try {
+                await DatabaseService.update('assets', assetData.id, assetData);
+              } catch (updateError) {
+                console.error('Error updating asset after UNIQUE constraint failure:', assetData.id, updateError);
+              }
+            } else if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
               // Check if parent exists, if not, create a placeholder
               const parentExists = await DatabaseService.getById('assets', assetData.parent_id);
               if (!parentExists) {
@@ -227,7 +265,21 @@ class SyncService {
                   metadata: JSON.stringify({ placeholder: true }),
                   synced: 1
                 };
-                await DatabaseService.insert('assets', parentData);
+                
+                try {
+                  await DatabaseService.insert('assets', parentData);
+                } catch (parentInsertError) {
+                  // If parent insert fails due to UNIQUE constraint, try update
+                  if (parentInsertError.message.includes('UNIQUE constraint failed')) {
+                    try {
+                      await DatabaseService.update('assets', parentData.id, parentData);
+                    } catch (parentUpdateError) {
+                      console.error('Error updating parent asset:', parentData.id, parentUpdateError);
+                    }
+                  } else {
+                    console.error('Error inserting parent asset:', parentData.id, parentInsertError);
+                  }
+                }
               }
               
               // Now try to insert the original asset
@@ -238,7 +290,16 @@ class SyncService {
                   await DatabaseService.insert('assets', assetData);
                 }
               } catch (retryError) {
-                console.error('Error inserting asset after parent creation:', assetData.id, retryError);
+                // If retry fails due to UNIQUE constraint, try update
+                if (retryError.message.includes('UNIQUE constraint failed')) {
+                  try {
+                    await DatabaseService.update('assets', assetData.id, assetData);
+                  } catch (updateRetryError) {
+                    console.error('Error updating asset after parent creation:', assetData.id, updateRetryError);
+                  }
+                } else {
+                  console.error('Error inserting asset after parent creation:', assetData.id, retryError);
+                }
               }
             } else {
               console.error('Error inserting asset:', assetData.id, insertError);

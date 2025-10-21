@@ -57,20 +57,23 @@ export const AssetHierarchyService = {
         return;
       }
 
+      // Clear existing assets before caching new ones
+      await DatabaseService.executeQuery('DELETE FROM assets');
+
+      // Sort assets by hierarchy level to ensure parents are inserted before children
+      const sortedAssets = [...assets].sort((a, b) => {
+        const levelA = a.level || 0;
+        const levelB = b.level || 0;
+        return levelA - levelB;
+      });
+
+      // Create a map of all asset IDs for quick lookup
+      const assetIdMap = new Set(sortedAssets.map(asset => asset._id || asset.id));
+
       // Temporarily disable foreign key constraints to avoid insertion order issues
       await DatabaseService.executeQuery('PRAGMA foreign_keys = OFF');
-
+      
       try {
-        // Clear existing assets before caching new ones
-        await DatabaseService.executeQuery('DELETE FROM assets');
-
-        // Sort assets by hierarchy level to ensure parents are inserted before children
-        const sortedAssets = [...assets].sort((a, b) => {
-          const levelA = a.level || 0;
-          const levelB = b.level || 0;
-          return levelA - levelB;
-        });
-
         // Insert all assets
         for (const asset of sortedAssets) {
           const assetData = {
@@ -94,12 +97,52 @@ export const AssetHierarchyService = {
             synced: 1
           };
 
+          // Check if parent exists in our asset list or database, if not, set parent_id to null
+          if (assetData.parent_id) {
+            const parentExistsInBatch = assetIdMap.has(assetData.parent_id);
+            let parentExistsInDatabase = false;
+            
+            if (!parentExistsInBatch) {
+              try {
+                const parentInDb = await DatabaseService.getById('assets', assetData.parent_id);
+                parentExistsInDatabase = !!parentInDb;
+              } catch (error) {
+                console.log(`Error checking parent in database: ${error.message}`);
+                parentExistsInDatabase = false;
+              }
+            }
+            
+            if (!parentExistsInBatch && !parentExistsInDatabase) {
+              console.log(`Parent asset ${assetData.parent_id} not found in batch or database, setting parent_id to null for ${assetData.id}`);
+              assetData.parent_id = null;
+            }
+          }
+
           try {
-            await DatabaseService.insert('assets', assetData);
+            // Use INSERT OR REPLACE to handle both UNIQUE and FOREIGN KEY constraints
+            await DatabaseService.executeQuery(`
+              INSERT OR REPLACE INTO assets 
+              (id, name, type, parent_id, hierarchy_path, metadata, synced, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              assetData.id,
+              assetData.name,
+              assetData.type,
+              assetData.parent_id,
+              assetData.hierarchy_path,
+              assetData.metadata,
+              assetData.synced,
+              Math.floor(Date.now() / 1000),
+              Math.floor(Date.now() / 1000)
+            ]);
           } catch (insertError) {
             // If insert fails (duplicate), try update
             if (insertError.message.includes('UNIQUE constraint failed')) {
-              await DatabaseService.update('assets', assetData.id, assetData);
+              try {
+                await DatabaseService.update('assets', assetData.id, assetData);
+              } catch (updateError) {
+                console.error('Error updating asset:', assetData.id, updateError);
+              }
             } else if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
               // If foreign key constraint fails, create a placeholder parent
               const parentExists = await DatabaseService.getById('assets', assetData.parent_id);
@@ -113,17 +156,47 @@ export const AssetHierarchyService = {
                   metadata: JSON.stringify({ placeholder: true }),
                   synced: 1
                 };
-                await DatabaseService.insert('assets', parentData);
+                
+                try {
+                  await DatabaseService.insert('assets', parentData);
+                } catch (parentInsertError) {
+                  // If parent insert fails due to UNIQUE constraint, try update
+                  if (parentInsertError.message.includes('UNIQUE constraint failed')) {
+                    try {
+                      await DatabaseService.update('assets', parentData.id, parentData);
+                    } catch (parentUpdateError) {
+                      console.error('Error updating parent asset:', parentData.id, parentUpdateError);
+                    }
+                  } else {
+                    console.error('Error inserting parent asset:', parentData.id, parentInsertError);
+                  }
+                }
                 
                 // Now try to insert the original asset again
                 try {
                   await DatabaseService.insert('assets', assetData);
                 } catch (retryError) {
-                  console.error('Error inserting asset after parent creation:', assetData.id, retryError);
+                  // If retry fails due to UNIQUE constraint, try update
+                  if (retryError.message.includes('UNIQUE constraint failed')) {
+                    try {
+                      await DatabaseService.update('assets', assetData.id, assetData);
+                    } catch (updateRetryError) {
+                      console.error('Error updating asset after parent creation:', assetData.id, updateRetryError);
+                    }
+                  } else {
+                    console.error('Error inserting asset after parent creation:', assetData.id, retryError);
+                  }
+                }
+              } else {
+                // Parent exists but still foreign key error, try update instead
+                try {
+                  await DatabaseService.update('assets', assetData.id, assetData);
+                } catch (updateError) {
+                  console.error('Error updating asset with existing parent:', assetData.id, updateError);
                 }
               }
             } else {
-              console.error('Error inserting asset:', insertError);
+              console.error('Error inserting asset:', assetData.id, insertError);
             }
           }
         }

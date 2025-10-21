@@ -14,6 +14,12 @@ export const TaskHazardService = {
    */
   getAll: async (params = {}) => {
     try {
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        console.log('Database not ready, waiting...');
+        await DatabaseService.waitForDatabaseReady();
+      }
+
       // Try to fetch from API first
       try {
         const response = await TaskHazardApi.getAll(params);
@@ -54,6 +60,12 @@ export const TaskHazardService = {
    */
   cacheTaskHazards: async (taskHazards) => {
     try {
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        console.log('Database not ready for cache write, waiting...');
+        await DatabaseService.waitForDatabaseReady();
+      }
+
       if (!Array.isArray(taskHazards) || taskHazards.length === 0) {
         return;
       }
@@ -110,6 +122,12 @@ export const TaskHazardService = {
    */
   getTaskHazardsFromCache: async () => {
     try {
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        console.log('Database not ready for cache read, waiting...');
+        await DatabaseService.waitForDatabaseReady();
+      }
+
       const cachedTaskHazards = await DatabaseService.getAll('task_hazards');
       
       if (!cachedTaskHazards || cachedTaskHazards.length === 0) {
@@ -117,8 +135,6 @@ export const TaskHazardService = {
       }
 
       // Transform cached task hazards back to API format
-      console.log('Retrieved from cache:', cachedTaskHazards.length, 'items');
-      console.log('Cache statuses:', cachedTaskHazards.map(item => ({ id: item.id, status: item.status })));
       
       const taskHazards = cachedTaskHazards.map(cached => {
         let hazards = [];
@@ -156,7 +172,6 @@ export const TaskHazardService = {
         };
       });
 
-      console.log('Transformed task hazards statuses:', taskHazards.map(item => ({ id: item.id, status: item.status })));
       return taskHazards;
     } catch (error) {
       console.error('Error loading task hazards from cache:', error);
@@ -433,7 +448,6 @@ export const TaskHazardService = {
           }
 
           // For real IDs, mark as deleted locally (soft delete)
-          console.log('Marking task hazard as deleted:', id);
           await DatabaseService.update('task_hazards', id, {
             status: 'deleted',
             synced: 0, // Mark as not synced
@@ -445,7 +459,6 @@ export const TaskHazardService = {
               _originalId: id
             })
           });
-          console.log('Task hazard marked as deleted successfully');
           
           // Add to sync queue for delete operation
           await DatabaseService.addToSyncQueue('task_hazard', id, 'delete', {

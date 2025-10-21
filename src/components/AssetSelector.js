@@ -47,7 +47,6 @@ const AssetSelector = ({
       console.error('AssetSelector: fetchAssets failed:', error.message);
       // Check if it's an authentication error
       if (error.code === 'AUTH_EXPIRED' || error.message?.includes('Authentication expired')) {
-        // console.log('AssetSelector: Authentication expired, user will be redirected to login');
         // Don't show alert for auth errors - global logout will handle navigation
       } else if (!error.message?.includes('connect to the internet')) {
         console.error("Error loading assets:", error.message);

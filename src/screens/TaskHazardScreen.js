@@ -120,13 +120,6 @@ const TaskHazardScreen = () => {
         return status !== 'deleted' && status !== 'removed';
       });
 
-      console.log('Total task hazards from service:', apiTaskHazards.length);
-      console.log('Active task hazards after filtering:', activeTaskHazards.length);
-      console.log('All task hazard statuses:', apiTaskHazards.map(item => ({ id: item.id, status: item.status })));
-      console.log('Deleted items found:', apiTaskHazards.filter(item => {
-        const status = item.status?.toLowerCase();
-        return status === 'deleted' || status === 'removed';
-      }).length);
 
       setTaskHazards(activeTaskHazards);
       setDataSource(response.source); // 'api' or 'cache'

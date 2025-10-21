@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardApi } from '../services';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import SignatureModal from '../components/SignatureModal';
 
 const ApprovalRequestsScreen = () => {
   const [approvalRequests, setApprovalRequests] = useState([]);
@@ -29,6 +31,7 @@ const ApprovalRequestsScreen = () => {
   const [approvalAction, setApprovalAction] = useState('approve'); // 'approve' or 'reject'
   const [comments, setComments] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const statusOptions = [
     { value: 'pending', label: 'Pending Approval', color: '#f59e0b' },
@@ -38,8 +41,26 @@ const ApprovalRequestsScreen = () => {
   ];
 
   useEffect(() => {
-    fetchApprovalRequests();
-  }, [selectedStatus]);
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchApprovalRequests();
+    }
+  }, [selectedStatus, currentUser]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const fetchApprovalRequests = async (isRefresh = false) => {
     try {
@@ -60,14 +81,104 @@ const ApprovalRequestsScreen = () => {
         params._t = Date.now();
       }
 
-      const response = await TaskHazardApi.getApprovals({includeInvalidated: true});
-      const data = response.data || {};
-    
-      setApprovalRequests(data.taskHazards || []);
+      let allRequests = [];
       
-      if (isRefresh) {
-        // console.log(`Refresh completed successfully. Found ${data.taskHazards?.length || 0} approval requests.`);
+      try {
+        // First try to get approval-specific data
+        const response = await TaskHazardApi.getApprovals({includeInvalidated: true});
+
+        console.log('Approval API response:', response);
+        const data = response.data || {};
+        allRequests = data.taskHazards || [];
+        console.log('Approval API taskHazards:', allRequests.ap);
+      } catch (approvalError) {
+        console.warn('Approval API failed, falling back to all task hazards:', approvalError);
+        
+        // Fallback: Get all task hazards and filter locally
+        try {
+          const { TaskHazardService } = await import('../services/TaskHazardService');
+          const allTaskHazardsResponse = await TaskHazardService.getAll();
+          allRequests = allTaskHazardsResponse.data || [];
+        } catch (fallbackError) {
+          console.error('Fallback also failed:', fallbackError);
+          throw fallbackError;
+        }
       }
+    
+      // Filter requests where current user is the supervisor and approval is required
+      const filteredRequests = allRequests.filter(request => {
+        // Extract supervisor information from the nested structure
+        let supervisorEmail = null;
+        let supervisorId = null;
+        
+        // Check if supervisor info is in the approvals array
+        if (request.approvals && request.approvals.length > 0) {
+          const latestApproval = request.approvals.find(approval => approval.isLatest) || request.approvals[0];
+          console.log('Latest approval:', latestApproval);
+          if (latestApproval && latestApproval.supervisor) {
+            console.log('Approval supervisor object:', latestApproval.supervisor);
+            supervisorEmail = latestApproval.supervisor.email || latestApproval.supervisor;
+            supervisorId = latestApproval.supervisor.id || latestApproval.supervisor._id;
+          }
+        }
+        
+        // Fallback to direct supervisor fields
+        if (!supervisorEmail) {
+          supervisorEmail = request.supervisor || request.supervisorEmail || request.assignedSupervisor;
+        }
+        if (!supervisorId) {
+          supervisorId = request.supervisorId || request.assignedSupervisorId;
+        }
+        
+        // Additional fallback: check if supervisor info is in metadata
+        if (!supervisorEmail && request.metadata) {
+          try {
+            const metadata = typeof request.metadata === 'string' ? JSON.parse(request.metadata) : request.metadata;
+            supervisorEmail = metadata.supervisor || metadata.supervisorEmail;
+            supervisorId = metadata.supervisorId;
+          } catch (e) {
+            console.log('Error parsing metadata:', e);
+          }
+        }
+        
+        // Check if supervisor info is in taskHazardData within approvals
+        if (!supervisorEmail && request.approvals && request.approvals.length > 0) {
+          const latestApproval = request.approvals.find(approval => approval.isLatest) || request.approvals[0];
+          if (latestApproval && latestApproval.taskHazardData) {
+            supervisorEmail = latestApproval.taskHazardData.supervisor || latestApproval.taskHazardData.supervisorEmail;
+            supervisorId = latestApproval.taskHazardData.supervisorId;
+          }
+        }
+        
+        console.log('Request ID:', request.id);
+        console.log('Full request structure:', JSON.stringify(request, null, 2));
+        console.log('Supervisor email:', supervisorEmail);
+        console.log('Supervisor ID:', supervisorId);
+        console.log('Current user email:', currentUser.email);
+        
+        // Only show requests where current user is the assigned supervisor
+        const isAssignedSupervisor = supervisorEmail === currentUser.email || 
+                                   supervisorEmail === currentUser.id ||
+                                   supervisorId === currentUser.id ||
+                                   supervisorId === currentUser.email;
+        
+        // Only show requests that require approval
+        const requiresApproval = request.requiresApproval || 
+                                request.approvalStatus === 'pending' ||
+                                request.status === 'Pending' ||
+                                request.approvalRequired ||
+                                (request.approvals && request.approvals.some(approval => approval.status === 'pending'));
+        
+        console.log('Is assigned supervisor:', isAssignedSupervisor);
+        console.log('Requires approval:', requiresApproval);
+        
+        return isAssignedSupervisor && requiresApproval;
+      });
+    
+      setApprovalRequests(filteredRequests);
+      
+      // Debug information
+      console.log(`Found ${allRequests.length} total requests, ${filteredRequests.length} for supervisor ${currentUser.email}`);
 
     } catch (error) {
       console.error('Error fetching approval requests:', error);
@@ -95,6 +206,162 @@ const ApprovalRequestsScreen = () => {
     setShowApprovalModal(true);
   };
 
+  const handleApproveWithSignature = async (signature) => {
+    console.log('handleApproveWithSignature called with signature:', signature);
+    console.log('selectedRequest:', selectedRequest);
+    console.log('selectedRequest.id:', selectedRequest?.id);
+    console.log('selectedRequest._id:', selectedRequest?._id);
+    
+    if (!selectedRequest?.id && !selectedRequest?._id) {
+      throw new Error('Task hazard ID is missing');
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      // Use either id or _id, whichever is available
+      const taskHazardId = selectedRequest.id || selectedRequest._id;
+      
+      // Validate taskHazardId
+      if (!taskHazardId || taskHazardId === 'undefined' || taskHazardId === 'null') {
+        throw new Error('Invalid task hazard ID: ' + taskHazardId);
+      }
+      
+      // Ensure it's a string
+      const safeTaskHazardId = String(taskHazardId);
+      
+      const approvalData = {
+        status: 'Approved',
+        comments: comments.trim(),
+        signature: signature,
+        approvedBy: currentUser.email,
+        approvedAt: new Date().toISOString()
+      };
+      
+      console.log('Sending approval data:', approvalData);
+      console.log('Task Hazard ID:', safeTaskHazardId);
+      console.log('Task Hazard ID type:', typeof safeTaskHazardId);
+      
+      const response = await TaskHazardApi.processApproval(safeTaskHazardId, approvalData);
+      console.log('Approval response:', response);
+
+      Alert.alert(
+        'Success',
+        'Task hazard approved successfully!',
+        [{ text: 'OK' }]
+      );
+
+      // Refresh the list
+      await fetchApprovalRequests();
+      
+      // Close modal
+      setShowApprovalModal(false);
+      setSelectedRequest(null);
+      setComments('');
+    } catch (error) {
+      console.error('Error approving task hazard:', error);
+      
+      // Check if it's a network error
+      const isNetworkError = error.message?.toLowerCase().includes('network') || 
+                            error.message?.toLowerCase().includes('fetch') ||
+                            error.code === 'NETWORK_ERROR';
+      
+      if (isNetworkError) {
+        Alert.alert(
+          'Network Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to approve task hazard. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRejectWithSignature = async (signature) => {
+    console.log('handleRejectWithSignature called with signature:', signature);
+    console.log('selectedRequest:', selectedRequest);
+    console.log('selectedRequest.id:', selectedRequest?.id);
+    console.log('selectedRequest._id:', selectedRequest?._id);
+    
+    if (!selectedRequest?.id && !selectedRequest?._id) {
+      throw new Error('Task hazard ID is missing');
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      // Use either id or _id, whichever is available
+      const taskHazardId = selectedRequest.id || selectedRequest._id;
+      
+      // Validate taskHazardId
+      if (!taskHazardId || taskHazardId === 'undefined' || taskHazardId === 'null') {
+        throw new Error('Invalid task hazard ID: ' + taskHazardId);
+      }
+      
+      // Ensure it's a string
+      const safeTaskHazardId = String(taskHazardId);
+      
+      const rejectionData = {
+        status: 'Rejected',
+        comments: comments.trim(),
+        signature: signature,
+        rejectedBy: currentUser.email,
+        rejectedAt: new Date().toISOString()
+      };
+      
+      console.log('Sending rejection data:', rejectionData);
+      console.log('Task Hazard ID:', safeTaskHazardId);
+      console.log('Task Hazard ID type:', typeof safeTaskHazardId);
+      
+      const response = await TaskHazardApi.processApproval(safeTaskHazardId, rejectionData);
+      console.log('Rejection response:', response);
+
+      Alert.alert(
+        'Success',
+        'Task hazard rejected successfully!',
+        [{ text: 'OK' }]
+      );
+
+      // Refresh the list
+      await fetchApprovalRequests();
+      
+      // Close modal
+      setShowApprovalModal(false);
+      setSelectedRequest(null);
+      setComments('');
+    } catch (error) {
+      console.error('Error rejecting task hazard:', error);
+      
+      // Check if it's a network error
+      const isNetworkError = error.message?.toLowerCase().includes('network') || 
+                            error.message?.toLowerCase().includes('fetch') ||
+                            error.code === 'NETWORK_ERROR';
+      
+      if (isNetworkError) {
+        Alert.alert(
+          'Network Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to reject task hazard. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const processApproval = async () => {
     if (!selectedRequest) return;
 
@@ -107,7 +374,11 @@ const ApprovalRequestsScreen = () => {
         throw new Error('Task hazard ID is missing');
       }
       
-      await TaskHazardApi.processApproval(selectedRequest.id, {
+      // Use safe ID handling for the old processApproval function too
+      const taskHazardId = selectedRequest.id || selectedRequest._id;
+      const safeTaskHazardId = String(taskHazardId);
+      
+      await TaskHazardApi.processApproval(safeTaskHazardId, {
         status,
         comments: comments.trim()
       });
@@ -313,115 +584,14 @@ const ApprovalRequestsScreen = () => {
   };
 
   const renderApprovalModal = () => (
-    <Modal
+    <SignatureModal
       visible={showApprovalModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowApprovalModal(false)}
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <StatusBar barStyle="dark-content" />
-        
-        {/* Modal Header */}
-        <View style={styles.modalHeader}>
-          <TouchableOpacity 
-            onPress={() => setShowApprovalModal(false)} 
-            style={styles.closeButton}
-          >
-            <Ionicons name="close" size={24} color="#64748b" />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>
-            {approvalAction === 'approve' ? 'Approve' : 'Reject'} Task Hazard
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        <ScrollView style={styles.modalContent}>
-          {/* Task Summary */}
-          {selectedRequest && (
-            <View style={styles.taskSummary}>
-              <Text style={styles.taskSummaryTitle}>{selectedRequest.scopeOfWork}</Text>
-              <Text style={styles.taskSummarySubtitle}>ID: {selectedRequest.id}</Text>
-              
-              <View style={styles.taskSummaryDetails}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Date & Time:</Text>
-                  <Text style={styles.summaryValue}>
-                    {selectedRequest.date} {selectedRequest.time}
-                  </Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Location:</Text>
-                  <Text style={styles.summaryValue}>{selectedRequest.location}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Team Members:</Text>
-                  <Text style={styles.summaryValue}>
-                    {selectedRequest.individuals?.length || 0}
-                  </Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Risks Identified:</Text>
-                  <Text style={styles.summaryValue}>{selectedRequest.risks?.length || 0}</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Comments Section */}
-          <View style={styles.commentsInputSection}>
-            <Text style={styles.commentsInputLabel}>
-              Comments {approvalAction === 'reject' ? '(Required)' : '(Optional)'}
-            </Text>
-            <TextInput
-              style={styles.commentsInput}
-              value={comments}
-              onChangeText={setComments}
-              placeholder={`Add your comments for ${approvalAction === 'approve' ? 'approval' : 'rejection'}...`}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-        </ScrollView>
-
-        {/* Modal Footer */}
-        <View style={styles.modalFooter}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => setShowApprovalModal(false)}
-            disabled={isProcessing}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.confirmButton,
-              approvalAction === 'approve' ? styles.approveConfirmButton : styles.rejectConfirmButton,
-              isProcessing && styles.disabledButton
-            ]}
-            onPress={processApproval}
-            disabled={isProcessing || (approvalAction === 'reject' && !comments.trim())}
-          >
-            {isProcessing ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Ionicons 
-                  name={approvalAction === 'approve' ? "checkmark" : "close"} 
-                  size={18} 
-                  color="#fff" 
-                />
-                <Text style={styles.confirmButtonText}>
-                  {approvalAction === 'approve' ? 'Approve' : 'Reject'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </Modal>
+      onClose={() => setShowApprovalModal(false)}
+      onApprove={handleApproveWithSignature}
+      onReject={handleRejectWithSignature}
+      taskHazard={selectedRequest}
+      isLoading={isProcessing}
+    />
   );
 
   const renderEmptyState = () => {

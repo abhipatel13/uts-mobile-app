@@ -268,12 +268,33 @@ class DatabaseService {
   }
 
   /**
+   * Check if database is ready for operations
+   */
+  isDatabaseReady() {
+    return this.isInitialized && this.db !== null;
+  }
+
+  /**
+   * Wait for database to be ready
+   */
+  async waitForDatabaseReady(timeout = 5000) {
+    const startTime = Date.now();
+    while (!this.isDatabaseReady() && (Date.now() - startTime) < timeout) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!this.isDatabaseReady()) {
+      throw new Error('Database initialization timeout');
+    }
+  }
+
+  /**
    * Execute a raw SQL query
    */
   async executeQuery(sql, params = []) {
     try {
-      if (!this.db) {
-        throw new Error('Database not initialized');
+      if (!this.isDatabaseReady()) {
+        console.log('Database not ready, waiting...');
+        await this.waitForDatabaseReady();
       }
       
       // Validate params - ensure no undefined values
@@ -293,12 +314,19 @@ class DatabaseService {
    */
   async selectQuery(sql, params = []) {
     try {
-      if (!this.db) {
-        throw new Error('Database not initialized');
+      if (!this.isDatabaseReady()) {
+        console.log('Database not ready for select, waiting...');
+        await this.waitForDatabaseReady();
       }
-      return await this.db.getAllAsync(sql, params);
+      
+      // Validate params - ensure no undefined values
+      const cleanParams = params.map(p => p === undefined ? null : p);
+      
+      return await this.db.getAllAsync(sql, cleanParams);
     } catch (error) {
       console.error('Error executing select query:', error);
+      console.error('SQL:', sql);
+      console.error('Params:', params);
       throw error;
     }
   }

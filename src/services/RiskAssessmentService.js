@@ -42,6 +42,12 @@ class RiskAssessmentService {
    */
   static async getAll(params = {}) {
     try {
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        console.log('Database not ready for risk assessments, waiting...');
+        await DatabaseService.waitForDatabaseReady();
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {
@@ -345,6 +351,12 @@ class RiskAssessmentService {
    */
   static async getRiskAssessmentsFromCache() {
     try {
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        console.log('Database not ready for risk assessment cache read, waiting...');
+        await DatabaseService.waitForDatabaseReady();
+      }
+
       const assessments = await DatabaseService.getAll('risk_assessments', 'status != ?', ['deleted']);
       return assessments.map(assessment => {
         const metadata = assessment.metadata ? JSON.parse(assessment.metadata) : {};
@@ -386,74 +398,36 @@ class RiskAssessmentService {
       let syncedCount = 0;
       let failedCount = 0;
 
-      console.log(`Syncing ${pendingItems.length} pending risk assessments`);
-
       for (const item of pendingItems) {
-        // Double-check the item is still unsynced (in case of concurrent processing)
-        const currentItem = await DatabaseService.getById('risk_assessments', item.id);
-        if (!currentItem || currentItem.synced === 1) {
-          console.log(`Skipping already synced item: ${item.id}`);
-          continue;
-        }
         try {
           if (item.status === 'deleted') {
-            console.log(`Deleting risk assessment: ${item.id}`);
             await RiskAssessmentApi.delete(item.id);
             await DatabaseService.delete('risk_assessments', item.id);
           } else {
             // Try to create or update
             if (item.id.startsWith('temp_')) {
               // This is a new item, create it
-              console.log(`Creating new risk assessment: ${item.id}`);
               const apiPayload = RiskAssessmentService.buildApiPayloadFromLocal(item);
               const response = await RiskAssessmentApi.create(apiPayload);
               if (response && response.data) {
-                console.log(`Created risk assessment with server ID: ${response.data.id}`);
-                // Delete the temp record and insert the server version
-                await DatabaseService.delete('risk_assessments', item.id);
-                
-                // Insert the server version with the real ID
-                const serverData = {
+                // Update local record with server ID
+                await DatabaseService.update('risk_assessments', item.id, {
                   id: response.data.id,
-                  title: response.data.title || response.data.scopeOfWork,
-                  location: response.data.location,
-                  date: response.data.date,
-                  time: response.data.time,
-                  assessor: response.data.assessor || response.data.supervisor,
-                  risks: response.data.risks ? JSON.stringify(response.data.risks) : null,
-                  controls: response.data.controls ? JSON.stringify(response.data.controls) : null,
-                  severity: response.data.severity,
-                  likelihood: response.data.likelihood,
-                  status: response.data.status || 'draft',
-                  created_by: response.data.created_by,
-                  metadata: JSON.stringify({
-                    ...response.data,
-                    _syncedFromServer: true
-                  }),
-                  created_at: Math.floor(Date.now() / 1000),
-                  updated_at: Math.floor(Date.now() / 1000),
                   synced: 1
-                };
-                
-                await DatabaseService.insert('risk_assessments', serverData);
-                console.log(`Successfully synced risk assessment: ${item.id} -> ${response.data.id}`);
+                });
               }
             } else {
               // This is an update
-              console.log(`Updating risk assessment: ${item.id}`);
               const apiPayload = RiskAssessmentService.buildApiPayloadFromLocal(item);
               await RiskAssessmentApi.update(item.id, apiPayload);
               await DatabaseService.update('risk_assessments', item.id, { synced: 1 });
-              console.log(`Successfully updated risk assessment: ${item.id}`);
             }
           }
           syncedCount++;
         } catch (error) {
-          console.error(`Error syncing risk assessment ${item.id}:`, error);
           const message = error?.message?.toLowerCase?.() || '';
           const isNetworkError = message.includes('network request failed') || message.includes('network') || message.includes('fetch');
           if (isNetworkError) {
-            console.log(`Network error for ${item.id}, keeping as pending`);
             // do not increment failed; keep pending
           } else {
             console.error(`❌ Failed to sync risk assessment ${item.id}:`, error?.message || error);
@@ -478,6 +452,12 @@ class RiskAssessmentService {
    */
   static async getPendingCount() {
     try {
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        console.log('Database not ready for pending count, waiting...');
+        await DatabaseService.waitForDatabaseReady();
+      }
+
       const pendingItems = await DatabaseService.getAll('risk_assessments', 'synced = ?', [0]);
       return pendingItems.length;
     } catch (error) {

@@ -24,7 +24,6 @@ const DashboardScreen = ({ navigation }) => {
     company: '',
   });
 
-  console.log('userInfo', userInfo);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -199,7 +198,7 @@ const DashboardScreen = ({ navigation }) => {
           </View>
           <View style={styles.welcomeContent}>
             <Text style={styles.welcomeText} numberOfLines={1}>
-              Hello, {String(userInfo.fullName || 'User')}!
+              Hello, {String(userInfo.name || 'User')}!
             </Text>
             <Text style={styles.subtitleText} numberOfLines={2}>
               {String(userInfo.role || 'User')} Dashboard - Manage your work efficiently

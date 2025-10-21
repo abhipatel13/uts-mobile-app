@@ -170,7 +170,6 @@ export const UserService = {
       try {
         const response = await UserApi.getOne(id);
 
-        console.log('response', response);
         return response;
       } catch (apiError) {
         // Fall back to cache

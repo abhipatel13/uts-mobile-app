@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from '../services/AuthService';
+import { UserService } from '../services/UserService';
 import { triggerAuthRefresh } from '../utils/globalHandlers';
 import CustomAlertModal from '../components/CustomAlertModal';
 import { useCustomAlert } from '../hooks/useCustomAlert';
@@ -81,17 +82,41 @@ export default function LoginScreen({ navigation }) {
 
       const { user, token } = data.data;
 
-      console.log('user', user);
 
-      // Store user data and token
-      await AsyncStorage.setItem('user', JSON.stringify({
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        company: user.company.name || user.company.id,
-        isAuthenticated: true,
-      }));
+      // Fetch complete user information using UserService
+      try {
+        const userResponse = await UserService.getOne(user._id);
+        
+        if (userResponse && userResponse.data) {
+          const userData = userResponse.data;
+          
+          // Store complete user data
+          await AsyncStorage.setItem('user', JSON.stringify({
+            id: userData._id || userData.id,
+            email: userData.email,
+            name: userData.name || userData.fullName,
+            fullName: userData.fullName || userData.name,
+            role: userData.role,
+            company: userData.company?.name || userData.company?.id || user.company.name || user.company.id,
+            isAuthenticated: true,
+            ...userData // Store all additional user data
+          }));
+        } else {
+          throw new Error('No user data received');
+        }
+      } catch (userFetchError) {
+        console.warn('Error fetching complete user data:', userFetchError);
+        // Fallback to basic user data
+        await AsyncStorage.setItem('user', JSON.stringify({
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          company: user.company.name || user.company.id,
+          isAuthenticated: true,
+        }));
+      }
+
       await AsyncStorage.setItem('authToken', token);
       // Trigger immediate auth refresh to navigate to dashboard
       triggerAuthRefresh();

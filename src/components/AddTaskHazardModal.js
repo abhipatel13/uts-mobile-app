@@ -329,6 +329,12 @@ const AddTaskHazardModal = ({
       return;
     }
 
+    // Determine if signature is required based on risk level or other criteria
+    const requiresSignature = formData.risks.some(risk => 
+      risk.asIsLikelihood * risk.asIsConsequence >= 12 || // High risk
+      risk.asIsLikelihood * risk.asIsConsequence >= 9     // Medium-High risk
+    ) || formData.systemLockoutRequired || formData.trainedWorkforce;
+
     const taskHazardToCreate = {
       date: formData.date,
       time: formData.time,
@@ -339,9 +345,11 @@ const AddTaskHazardModal = ({
       individual: formData.individual.trim(),
       supervisor: formData.supervisor.trim(),
       location: formData.location.trim(),
-      status: formData.status,
+      status: requiresSignature && formData.supervisor ? 'Pending' : formData.status,
       geoFenceLimit: parseInt(formData.geoFenceLimit) || 200,
-      risks: formData.risks
+      risks: formData.risks,
+      requiresApproval: requiresSignature && !!formData.supervisor,
+      approvalStatus: requiresSignature && formData.supervisor ? 'pending' : 'not_required'
     };
 
     try {
