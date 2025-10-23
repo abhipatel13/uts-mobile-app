@@ -99,6 +99,9 @@ class SyncService {
       case 'risk_assessment':
         return await this.syncRiskAssessment(item.operation, item.entity_id, data);
       
+      case 'approval':
+        return await this.syncApproval(item.operation, item.entity_id, data);
+      
       default:
         console.warn(`Unknown entity type: ${item.entity_type}`);
     }
@@ -135,17 +138,22 @@ class SyncService {
   async syncTaskHazard(operation, taskHazardId, data) {
     switch (operation) {
       case 'create':
-        const created = await TaskHazardApi.createTaskHazard(data);
+        const created = await TaskHazardApi.create(data);
         await DatabaseService.update('task_hazards', taskHazardId, { synced: 1 });
         return created;
       
       case 'update':
-        const updated = await TaskHazardApi.updateTaskHazard(taskHazardId, data);
+        const updated = await TaskHazardApi.update(taskHazardId, data);
         await DatabaseService.update('task_hazards', taskHazardId, { synced: 1 });
         return updated;
       
       case 'delete':
-        await TaskHazardApi.deleteTaskHazard(taskHazardId);
+        await TaskHazardApi.delete(taskHazardId);
+        await DatabaseService.delete('task_hazards', taskHazardId);
+        return;
+      
+      case 'delete_universal':
+        await TaskHazardApi.deleteUniversal(taskHazardId);
         await DatabaseService.delete('task_hazards', taskHazardId);
         return;
       
@@ -180,6 +188,21 @@ class SyncService {
   }
 
   /**
+   * Sync approval to server
+   */
+  async syncApproval(operation, approvalId, data) {
+    switch (operation) {
+      case 'process':
+        const response = await TaskHazardApi.processApproval(approvalId, data);
+        await DatabaseService.update('approvals', approvalId, { synced: 1 });
+        return response;
+      
+      default:
+        throw new Error(`Unknown operation: ${operation}`);
+    }
+  }
+
+  /**
    * Cache data from server to local database
    */
   async cacheAssets(assets) {
@@ -189,7 +212,8 @@ class SyncService {
       }
 
       // Temporarily disable foreign key constraints to avoid insertion order issues
-      await DatabaseService.executeQuery('PRAGMA foreign_keys = OFF');
+      const db = DatabaseService.getDatabase();
+      await db.execAsync('PRAGMA foreign_keys = OFF;');
 
       try {
         for (const asset of assets) {
@@ -215,13 +239,11 @@ class SyncService {
                 const parentInDb = await DatabaseService.getById('assets', assetData.parent_id);
                 parentExistsInDatabase = !!parentInDb;
               } catch (error) {
-                console.log(`Error checking parent in database: ${error.message}`);
                 parentExistsInDatabase = false;
               }
             }
             
             if (!parentExistsInBatch && !parentExistsInDatabase) {
-              console.log(`Parent asset ${assetData.parent_id} not found in batch or database, setting parent_id to null for ${assetData.id}`);
               assetData.parent_id = null;
             }
           }
@@ -308,13 +330,15 @@ class SyncService {
         }
       } finally {
         // Re-enable foreign key constraints
-        await DatabaseService.executeQuery('PRAGMA foreign_keys = ON');
+        const db = DatabaseService.getDatabase();
+        await db.execAsync('PRAGMA foreign_keys = ON;');
       }
     } catch (error) {
       console.error('Error caching assets:', error);
       // Re-enable foreign key constraints even if there was an error
       try {
-        await DatabaseService.executeQuery('PRAGMA foreign_keys = ON');
+        const db = DatabaseService.getDatabase();
+        await db.execAsync('PRAGMA foreign_keys = ON;');
       } catch (fkError) {
         console.error('Error re-enabling foreign key constraints:', fkError);
       }
@@ -400,6 +424,7 @@ class SyncService {
       const unsyncedAssets = await DatabaseService.getAll('assets', 'synced = 0');
       const unsyncedTaskHazards = await DatabaseService.getAll('task_hazards', 'synced = 0');
       const unsyncedRiskAssessments = await DatabaseService.getAll('risk_assessments', 'synced = 0');
+      const unsyncedApprovals = await DatabaseService.getAll('approvals', 'synced = 0');
 
       return {
         isSyncing: this.isSyncing,
@@ -407,7 +432,8 @@ class SyncService {
         unsynced: {
           assets: unsyncedAssets.length,
           taskHazards: unsyncedTaskHazards.length,
-          riskAssessments: unsyncedRiskAssessments.length
+          riskAssessments: unsyncedRiskAssessments.length,
+          approvals: unsyncedApprovals.length
         }
       };
     } catch (error) {

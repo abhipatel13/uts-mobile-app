@@ -591,6 +591,7 @@ const EditTaskHazardModal = ({
       <TaskRisksComponent
         risks={formData.risks}
         onRisksChange={(risks) => handleInputChange('risks', risks)}
+        context="taskHazard"
       />
       {errors.risks && (
         <Text style={[styles.errorText, styles.riskErrorText]}>{errors.risks}</Text>

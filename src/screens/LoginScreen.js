@@ -214,6 +214,8 @@ export default function LoginScreen({ navigation }) {
                 source={require('../../assets/uts-logo.png')} 
                 style={styles.logoImage}
                 resizeMode="contain"
+                fadeDuration={0}
+                backgroundColor="transparent"
               />
             </View>
             <Text style={styles.subtitle}>Welcome</Text>
@@ -370,6 +372,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 20,
+    minHeight: 120,
   },
   logoImage: {
     width: 200,

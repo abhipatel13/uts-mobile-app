@@ -77,8 +77,8 @@ const EditRiskAssessmentModal = ({
             return riskAssessment.assessmentTeam;
           } else if (Array.isArray(riskAssessment.individuals)) {
             return riskAssessment.individuals;
-          } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals.trim()) {
-            return riskAssessment.individuals.split(',').map(email => email.trim());
+          } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals && riskAssessment.individuals.trim()) {
+            return riskAssessment.individuals.split(',').map(email => email.trim()).filter(email => email);
           }
           return [];
         })(),

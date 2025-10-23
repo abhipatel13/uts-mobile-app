@@ -173,9 +173,19 @@ const RiskAssessmentScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await RiskAssessmentService.delete(riskAssessmentId);
+              const response = await RiskAssessmentService.delete(riskAssessmentId);
               await fetchRiskAssessments();
-              Alert.alert('Success', 'Risk Assessment deleted successfully!');
+              
+              // Show appropriate message based on whether it was deleted offline or online
+              if (response.source === 'offline') {
+                Alert.alert(
+                  'Deleted Offline',
+                  'Risk Assessment deleted locally. It will be synced to the server when you\'re back online.',
+                  [{ text: 'OK' }]
+                );
+              } else {
+                Alert.alert('Success', 'Risk Assessment deleted successfully!');
+              }
             } catch (error) {
               console.error('Error deleting risk assessment:', error);
               Alert.alert('Error', error.message || 'Failed to delete risk assessment');
@@ -262,8 +272,9 @@ const RiskAssessmentScreen = () => {
                     const team = item.assessmentTeam || item.individuals;
                     if (Array.isArray(team)) {
                       return `${team.length} team member${team.length !== 1 ? 's' : ''}`;
-                    } else if (typeof team === 'string') {
-                      return `${team.split(',').length} team member${team.split(',').length !== 1 ? 's' : ''}`;
+                    } else if (typeof team === 'string' && team.trim()) {
+                      const members = team.split(',').filter(m => m.trim());
+                      return `${members.length} team member${members.length !== 1 ? 's' : ''}`;
                     }
                     return '0 team members';
                   })()}

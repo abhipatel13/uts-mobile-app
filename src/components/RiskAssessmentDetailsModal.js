@@ -27,19 +27,21 @@ const RiskAssessmentDetailsModal = ({
 
   const riskCount = riskAssessment.risks?.length || 0;
   const individualCount = (() => {
-    if (Array.isArray(riskAssessment.individuals)) {
-      return riskAssessment.individuals.length;
-    } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals.trim()) {
-      return riskAssessment.individuals.split(',').length;
+    const team = riskAssessment.assessmentTeam || riskAssessment.individuals;
+    if (Array.isArray(team)) {
+      return team.length;
+    } else if (typeof team === 'string' && team && team.trim()) {
+      return team.split(',').filter(m => m.trim()).length;
     }
     return 0;
   })();
   
   const individuals = (() => {
-    if (Array.isArray(riskAssessment.individuals)) {
-      return riskAssessment.individuals;
-    } else if (typeof riskAssessment.individuals === 'string' && riskAssessment.individuals.trim()) {
-      return riskAssessment.individuals.split(',').map(name => name.trim());
+    const team = riskAssessment.assessmentTeam || riskAssessment.individuals;
+    if (Array.isArray(team)) {
+      return team;
+    } else if (typeof team === 'string' && team && team.trim()) {
+      return team.split(',').map(name => name.trim()).filter(name => name);
     }
     return [];
   })();

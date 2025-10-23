@@ -209,8 +209,8 @@ const AssetSelector = ({
                   onPress={() => toggleExpanded(asset.id)}
                 >
                   <Ionicons 
-                    name={isExpanded ? "caret-down" : "caret-forward"} 
-                    size={14} 
+                    name={isExpanded ? "chevron-down" : "chevron-forward"} 
+                    size={18} 
                     color="#6b7280" 
                   />
                 </TouchableOpacity>
@@ -493,11 +493,11 @@ const styles = StyleSheet.create({
     marginRight: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 24,
-    height: 24,
+    width: 32,
+    height: 32,
   },
   expandButtonSpacer: {
-    width: 24,
+    width: 32,
     marginRight: 4,
   },
   assetInfoContainer: {

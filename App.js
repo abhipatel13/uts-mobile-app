@@ -13,6 +13,7 @@ import { UserService } from './src/services/UserService';
 import { AssetHierarchyService } from './src/services/AssetHierarchyService';
 import RiskAssessmentService from './src/services/RiskAssessmentService';
 import { TaskHazardService } from './src/services/TaskHazardService';
+import { ApprovalService } from './src/services/ApprovalService';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
@@ -23,7 +24,6 @@ const navigationRef = createRef();
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import AssetHierarchyScreen from './src/screens/AssetHierarchyScreen';
-import SafetyScreen from './src/screens/SafetyScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import TaskHazardScreen from './src/screens/TaskHazardScreen';
 import RiskAssessmentScreen from './src/screens/RiskAssessmentScreen';
@@ -41,6 +41,22 @@ function HeaderMenuButton({ onPress }) {
       onPress={onPress}
     >
       <Ionicons name="menu" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
+}
+
+// Custom GPS Header Button Component
+function HeaderGPSButton({ locationStatus, onPress }) {
+  const isLocationActive = locationStatus?.hasPermission;
+  const iconName = isLocationActive ? "location-outline" : "location-off-outline";
+  const iconColor = isLocationActive ? "#22c55e" : "#ef4444";
+  
+  return (
+    <TouchableOpacity
+      style={{ marginRight: 10, padding: 8 }}
+      onPress={onPress}
+    >
+      <Ionicons name={iconName} size={24} color={iconColor} />
     </TouchableOpacity>
   );
 }
@@ -122,6 +138,13 @@ function SidebarModal({ visible, onClose, navigation, currentRoute }) {
 function MainAppNavigator() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [currentRoute, setCurrentRoute] = useState('Dashboard');
+  const [locationStatus, setLocationStatus] = useState(null);
+
+  useEffect(() => {
+    // Get initial location status
+    const location = LocationService.getLocationStatus();
+    setLocationStatus(location);
+  }, []);
 
   const toggleSidebar = () => {
     setSidebarVisible(!sidebarVisible);
@@ -141,6 +164,12 @@ function MainAppNavigator() {
           },
           headerLeft: () => (
             <HeaderMenuButton onPress={toggleSidebar} />
+          ),
+          headerRight: () => (
+            <HeaderGPSButton 
+              locationStatus={locationStatus}
+              onPress={() => console.log('GPS pressed')} 
+            />
           ),
         })}
         screenListeners={{
@@ -166,13 +195,6 @@ function MainAppNavigator() {
         component={AssetHierarchyScreen}
         options={{
           title: 'Asset Hierarchy',
-        }}
-      />
-      <Stack.Screen 
-        name="Safety" 
-        component={SafetyScreen}
-        options={{
-          title: 'Safety',
         }}
       />
       <Stack.Screen 
@@ -242,28 +264,23 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
-      console.log('Starting app initialization...');
-      
       // Initialize database first
-      console.log('Initializing database...');
       await DatabaseService.initialize();
       
       // Wait for database to be fully ready
-      console.log('Waiting for database to be ready...');
       await DatabaseService.waitForDatabaseReady();
-      console.log('Database is ready!');
       
       // Initialize location service
-      console.log('Initializing location service...');
       await LocationService.initialize();
       
       // Start auto-sync for risk assessments
-      console.log('Starting risk assessment auto-sync...');
       RiskAssessmentService.startAutoSync();
-
+      
       // Start auto-sync for task hazards
-      console.log('Starting task hazard auto-sync...');
       TaskHazardService.startAutoSync();
+      
+      // Start auto-sync for approvals
+      ApprovalService.startAutoSync();
       
       // Set global logout handler
       setGlobalLogoutHandler(() => {
@@ -276,10 +293,7 @@ export default function App() {
       });
       
       // Check authentication status
-      console.log('Checking authentication status...');
       await checkAuthStatus();
-      
-      console.log('App initialization completed successfully!');
       
     } catch (error) {
       console.error('App initialization failed:', error);
@@ -307,21 +321,21 @@ export default function App() {
     try {      
       // Cache users in background (don't block app loading)
       UserService.getAll().catch(err => {
-        console.log('Could not cache users:', err.message);
+        // Could not cache users
       });
       
       // Cache assets in background
       AssetHierarchyService.getAll().catch(err => {
-        console.log('Could not cache assets:', err.message);
+        // Could not cache assets
       });
       
       // Cache risk assessments in background
       RiskAssessmentService.getAll().catch(err => {
-        console.log('Could not cache risk assessments:', err.message);
+        // Could not cache risk assessments
       });
       
     } catch (error) {
-      console.log('Error caching initial data:', error.message);
+      // Error caching initial data
     }
   };
 

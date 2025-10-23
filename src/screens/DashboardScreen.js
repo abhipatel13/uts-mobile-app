@@ -16,12 +16,8 @@ import LocationService from '../services/LocationService';
 
 const DashboardScreen = ({ navigation }) => {
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
-  const [locationStatus, setLocationStatus] = useState(null);
   const [userInfo, setUserInfo] = useState({
-    fullName: '',
-    email: '',
-    role: '',
-    company: '',
+    name: '',
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -48,18 +44,12 @@ const DashboardScreen = ({ navigation }) => {
 
       if (userData) {
         const parsedUser = JSON.parse(userData);
-        // Ensure we only extract string values, not objects
+        // Only extract the name field
         setUserInfo({
           name: typeof parsedUser.name === 'string' ? parsedUser.name : 'User',
-          email: typeof parsedUser.email === 'string' ? parsedUser.email : '',
-          role: typeof parsedUser.role === 'string' ? parsedUser.role : 'User',
-          company: typeof parsedUser.company === 'string' ? parsedUser.company : 'Utah Technical Services LLC',
         });
       }
       
-      // Get location status
-      const location = LocationService.getLocationStatus();
-      setLocationStatus(location);
     } catch (error) {
       console.error('DashboardScreen: initializeDashboard - Error:', error.message);
     } finally {
@@ -67,37 +57,6 @@ const DashboardScreen = ({ navigation }) => {
     }
   };
 
-  const handleQuickAction = (action) => {
-    try {
-      switch (action.action) {
-        case 'createTaskHazard':
-          navigation.navigate('Safety', { 
-            screen: 'TaskHazard',
-            params: { showAddModal: true }
-          });
-          break;
-        case 'createRiskAssessment':
-          navigation.navigate('Safety', { 
-            screen: 'RiskAssessment',
-            params: { showAddModal: true }
-          });
-          break;
-        case 'viewAssets':
-          navigation.navigate('AssetHierarchy');
-          break;
-        case 'viewAnalytics':
-          navigation.navigate('Analytics');
-          break;
-        default:
-          // Fallback to route navigation
-          navigation.navigate(action.route);
-          break;
-      }
-    } catch (error) {
-      console.error('DashboardScreen: handleQuickAction - Navigation error:', error.message);
-      Alert.alert('Navigation Error', 'Unable to navigate to the requested screen. Please try again.');
-    }
-  };
 
 
   const { width, height } = screenData;
@@ -117,14 +76,14 @@ const DashboardScreen = ({ navigation }) => {
       description: 'Create and manage task hazard assessments',
       icon: 'shield-checkmark-outline',
       color: '#22c55e',
-      route: 'Safety',
+      route: 'TaskHazard',
     },
     {
       title: 'Risk Assessment',
       description: 'Create and manage risk assessments',
       icon: 'shield-checkmark-outline',
       color: '#22c55e',
-      route: 'Safety',
+      route: 'RiskAssessment',
     },
     {
       title: 'Analytics',
@@ -135,44 +94,6 @@ const DashboardScreen = ({ navigation }) => {
     },
   ];
 
-  const quickActions = [
-    {
-      title: 'Create Task Hazard',
-      subtitle: 'Start a new assessment',
-      color: '#fef3c7',
-      textColor: '#92400e',
-      icon: 'add-circle-outline',
-      route: 'Safety',
-      action: 'createTaskHazard',
-    },
-    {
-      title: 'Risk Assessment',
-      subtitle: 'Evaluate risks',
-      color: '#dbeafe',
-      textColor: '#1e40af',
-      icon: 'shield-checkmark-outline',
-      route: 'Safety',
-      action: 'createRiskAssessment',
-    },
-    {
-      title: 'View Assets',
-      subtitle: 'Browse hierarchy',
-      color: '#d1fae5',
-      textColor: '#065f46',
-      icon: 'git-network-outline',
-      route: 'AssetHierarchy',
-      action: 'viewAssets',
-    },
-    {
-      title: 'Analytics',
-      subtitle: 'View reports',
-      color: '#ede9fe',
-      textColor: '#6b21a8',
-      icon: 'bar-chart-outline',
-      route: 'Analytics',
-      action: 'viewAnalytics',
-    },
-  ];
 
   const dynamicStyles = createDynamicStyles(width, isTablet, isSmallScreen);
 
@@ -201,67 +122,14 @@ const DashboardScreen = ({ navigation }) => {
               Hello, {String(userInfo.name || 'User')}!
             </Text>
             <Text style={styles.subtitleText} numberOfLines={2}>
-              {String(userInfo.role || 'User')} Dashboard - Manage your work efficiently
+              Dashboard - Manage your work efficiently
             </Text>
           </View>
         </View>
       </View>
 
-      {/* User Info Cards */}
-      <View style={[styles.infoCardsContainer, dynamicStyles.infoCardsContainer]}>
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardIcon}>
-            <Ionicons name="person-circle-outline" size={24} color="#7c3aed" />
-          </View>
-          <View style={styles.infoCardContent}>
-            <Text style={styles.infoCardLabel}>Role</Text>
-            <Text style={styles.infoCardValue}>{String(userInfo.role || '')}</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardIcon}>
-            <Ionicons name="mail-outline" size={24} color="#059669" />
-          </View>
-          <View style={styles.infoCardContent}>
-            <Text style={styles.infoCardLabel}>Email</Text>
-            <Text style={styles.infoCardValue} numberOfLines={1}>{String(userInfo.email || '')}</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoCardIcon}>
-            <Ionicons name="business-outline" size={24} color="#7c3aed" />
-          </View>
-          <View style={styles.infoCardContent}>
-            <Text style={styles.infoCardLabel}>Company</Text>
-            <Text style={styles.infoCardValue}>{String(userInfo.company || '')}</Text>
-          </View>
-        </View>
-      </View>
 
 
-      {/* Location Status */}
-      {locationStatus && (
-        <View style={styles.offlineStatusContainer}>
-          <Text style={styles.sectionTitle}>Location Status</Text>
-          <View style={styles.statusCard}>
-            <View style={styles.statusCardHeader}>
-              <Ionicons 
-                name={locationStatus.hasPermission ? "location-outline" : "location-off-outline"} 
-                size={20} 
-                color={locationStatus.hasPermission ? "#22c55e" : "#ef4444"} 
-              />
-              <Text style={styles.statusCardTitle}>
-                {locationStatus.hasPermission ? "GPS Active" : "GPS Disabled"}
-              </Text>
-            </View>
-            <Text style={styles.statusCardSubtitle}>
-              {locationStatus.hasPermission ? "Location tracking enabled" : "Location permission required"}
-            </Text>
-          </View>
-        </View>
-      )}
 
       {/* Main Dashboard Cards */}
       <View style={styles.cardsContainer}>
@@ -285,30 +153,6 @@ const DashboardScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.quickActionsContainer}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={[styles.quickActionsGrid, dynamicStyles.quickActionsGrid]}>
-          {quickActions.map((action, index) => (
-            <TouchableOpacity 
-              key={index} 
-              style={[styles.quickActionCard, dynamicStyles.quickActionCard, { backgroundColor: action.color }]}
-              onPress={() => handleQuickAction(action)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.quickActionHeader}>
-                <Ionicons name={action.icon} size={20} color={action.textColor} />
-                <Text style={[styles.quickActionTitle, { color: action.textColor }]}>
-                  {action.title}
-                </Text>
-              </View>
-              <Text style={[styles.quickActionSubtitle, { color: action.textColor }]}>
-                {action.subtitle}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -320,22 +164,6 @@ const createDynamicStyles = (width, isTablet, isSmallScreen) => {
   const cardGap = isSmallScreen ? 8 : isTablet ? 16 : 12;
 
   return StyleSheet.create({
-    infoCardsContainer: {
-      paddingHorizontal: padding,
-      gap: cardGap,
-    },
-    quickActionsGrid: {
-      gap: cardGap,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-    },
-    quickActionCard: {
-      width: isTablet ? '22%' : isSmallScreen ? '48%' : '48%',
-      minHeight: isTablet ? 100 : isSmallScreen ? 85 : 90,
-      marginBottom: cardGap,
-      padding: isSmallScreen ? 12 : 16,
-    },
   });
 };
 
@@ -402,54 +230,6 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '500',
   },
-  infoCardsContainer: {
-    flexDirection: 'column',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 12,
-  },
-  infoCard: {
-    width: '100%',
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    minHeight: 80,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  infoCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    flexShrink: 0,
-  },
-  infoCardIcon: {
-    marginRight: 16,
-  },
-  infoCardContent: {
-    flex: 1,
-  },
-  infoCardLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  infoCardValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    lineHeight: 20,
-  },
   cardsContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
@@ -494,78 +274,6 @@ const styles = StyleSheet.create({
   cardAction: {
     fontSize: 12,
     color: '#64748b',
-  },
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  quickActionCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 12,
-    minHeight: 90,
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  quickActionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  quickActionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
-    flex: 1,
-    lineHeight: 18,
-  },
-  quickActionSubtitle: {
-    fontSize: 11,
-    lineHeight: 14,
-    opacity: 0.8,
-  },
-  offlineStatusContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  statusCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  statusCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginLeft: 8,
-  },
-  statusCardSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
   },
 });
 

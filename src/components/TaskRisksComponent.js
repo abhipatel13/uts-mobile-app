@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import RiskMatrixModal from './RiskMatrixModal';
 
-const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
+const TaskRisksComponent = ({ risks = [], onRisksChange, context = 'riskAssessment' }) => {
   const [expandedRisks, setExpandedRisks] = useState(new Set());
   const [showAsIsMatrix, setShowAsIsMatrix] = useState(false);
   const [showMitigatedMatrix, setShowMitigatedMatrix] = useState(false);
@@ -564,18 +564,16 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
               </View>
             </View>
 
-            {/* Supervisor Signature Required */}
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => updateRisk(index, 'requiresSupervisorSignature', !risk.requiresSupervisorSignature)}
-            >
-              <View style={[styles.checkbox, risk.requiresSupervisorSignature && styles.checkboxChecked]}>
-                {risk.requiresSupervisorSignature && (
-                  <Ionicons name="checkmark" size={16} color="#fff" />
-                )}
+            {/* Supervisor Signature Alert */}
+            {risk.requiresSupervisorSignature && (
+              <View style={styles.supervisorAlert}>
+                <Ionicons name="warning" size={20} color="#f59e0b" />
+                <Text style={styles.supervisorAlertText}>
+                  Supervisor Signature Required for High Risk (Score: {risk.mitigatedScore})
+                </Text>
               </View>
-              <Text style={styles.checkboxLabel}>Requires Supervisor Signature</Text>
-            </TouchableOpacity>
+            )}
+
           </View>
         )}
       </View>
@@ -585,7 +583,9 @@ const TaskRisksComponent = ({ risks = [], onRisksChange }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Risk Assessment</Text>
+        <Text style={styles.title}>
+          {context === 'taskHazard' ? 'Task Hazard Risk' : 'Risk Assessment'}
+        </Text>
         <TouchableOpacity style={styles.addButton} onPress={addRisk}>
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.addButtonText}>Add Risk</Text>
@@ -805,29 +805,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#374151',
   },
-  checkboxContainer: {
+  supervisorAlert: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
     marginTop: 16,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    borderRadius: 4,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: 'rgb(52, 73, 94)',
-    borderColor: 'rgb(52, 73, 94)',
-  },
-  checkboxLabel: {
+  supervisorAlertText: {
     fontSize: 14,
-    color: '#374151',
+    color: '#92400e',
     fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
   },
   riskDescriptionInput: {
     minHeight: 80,

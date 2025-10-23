@@ -71,7 +71,8 @@ export const AssetHierarchyService = {
       const assetIdMap = new Set(sortedAssets.map(asset => asset._id || asset.id));
 
       // Temporarily disable foreign key constraints to avoid insertion order issues
-      await DatabaseService.executeQuery('PRAGMA foreign_keys = OFF');
+      const db = DatabaseService.getDatabase();
+      await db.execAsync('PRAGMA foreign_keys = OFF;');
       
       try {
         // Insert all assets
@@ -107,13 +108,11 @@ export const AssetHierarchyService = {
                 const parentInDb = await DatabaseService.getById('assets', assetData.parent_id);
                 parentExistsInDatabase = !!parentInDb;
               } catch (error) {
-                console.log(`Error checking parent in database: ${error.message}`);
                 parentExistsInDatabase = false;
               }
             }
             
             if (!parentExistsInBatch && !parentExistsInDatabase) {
-              console.log(`Parent asset ${assetData.parent_id} not found in batch or database, setting parent_id to null for ${assetData.id}`);
               assetData.parent_id = null;
             }
           }
@@ -203,7 +202,8 @@ export const AssetHierarchyService = {
 
       } finally {
         // Re-enable foreign key constraints
-        await DatabaseService.executeQuery('PRAGMA foreign_keys = ON');
+        const db = DatabaseService.getDatabase();
+        await db.execAsync('PRAGMA foreign_keys = ON;');
       }
     } catch (error) {
       console.error('Error caching assets:', error);

@@ -10,13 +10,60 @@ import NetInfo from '@react-native-community/netinfo';
  */
 export const TaskHazardService = {
   /**
+   * Convert a local DB record back into API payload shape
+   */
+  buildApiPayloadFromLocal: (item) => {
+    const metadata = item.metadata ? (() => { try { return JSON.parse(item.metadata); } catch { return {}; } })() : {};
+    
+    // Get risks from metadata (which stores the full original data)
+    let risks = metadata.risks ?? [];
+    
+    // If risks is not an array or is empty, try to parse from hazards field
+    if (!Array.isArray(risks) || risks.length === 0) {
+      const parsedHazards = Array.isArray(item.hazards) ? item.hazards : (() => { try { return item.hazards ? JSON.parse(item.hazards) : []; } catch { return []; } })();
+      if (parsedHazards.length > 0) {
+        risks = parsedHazards;
+      }
+    }
+    
+    // Ensure risks is always a non-empty array (API requirement)
+    if (!Array.isArray(risks) || risks.length === 0) {
+      risks = [{
+        hazard: 'No hazards specified',
+        control: 'No controls specified',
+        asIsLikelihood: 1,
+        asIsConsequence: 1,
+        toBeReviewDate: new Date().toISOString(),
+        responsiblePerson: item.supervisor || metadata.supervisor || 'Not assigned'
+      }];
+    }
+
+    return {
+      taskName: metadata.taskName ?? item.task_name ?? null,
+      scopeOfWork: metadata.scopeOfWork ?? item.task_name ?? null,
+      supervisor: item.supervisor ?? metadata.supervisor ?? null,
+      individual: metadata.individual ?? null,
+      location: item.location ?? metadata.location ?? null,
+      date: item.date ?? metadata.date ?? null,
+      time: metadata.time ?? null,
+      status: item.status ?? metadata.status ?? 'draft',
+      risks: risks,
+      assetSystem: metadata.assetSystem ?? null,
+      systemLockoutRequired: metadata.systemLockoutRequired ?? false,
+      trainedWorkforce: metadata.trainedWorkforce ?? false,
+      geoFenceLimit: metadata.geoFenceLimit ?? 200,
+      riskLevel: item.risk_level ?? metadata.riskLevel ?? null,
+      createdBy: item.created_by ?? metadata.createdBy ?? null,
+    };
+  },
+
+  /**
    * Get all task hazards - tries API first, falls back to local cache
    */
   getAll: async (params = {}) => {
     try {
       // Ensure database is ready before proceeding
       if (!DatabaseService.isDatabaseReady()) {
-        console.log('Database not ready, waiting...');
         await DatabaseService.waitForDatabaseReady();
       }
 
@@ -25,8 +72,8 @@ export const TaskHazardService = {
         const response = await TaskHazardApi.getAll(params);
         const apiTaskHazards = response.data || [];
 
-        // Cache the task hazards in SQLite for offline use
-        await TaskHazardService.cacheTaskHazards(apiTaskHazards);
+        // Cache the task hazards in SQLite for offline use (clear existing data first)
+        await TaskHazardService.cacheTaskHazards(apiTaskHazards, true);
 
         return {
           data: apiTaskHazards,
@@ -57,12 +104,13 @@ export const TaskHazardService = {
 
   /**
    * Cache task hazards to SQLite database
+   * @param {Array} taskHazards - Array of task hazards to cache
+   * @param {boolean} clearExisting - Whether to clear existing data first (default: false)
    */
-  cacheTaskHazards: async (taskHazards) => {
+  cacheTaskHazards: async (taskHazards, clearExisting = false) => {
     try {
       // Ensure database is ready before proceeding
       if (!DatabaseService.isDatabaseReady()) {
-        console.log('Database not ready for cache write, waiting...');
         await DatabaseService.waitForDatabaseReady();
       }
 
@@ -70,8 +118,10 @@ export const TaskHazardService = {
         return;
       }
 
-      // Clear existing task hazards before caching new ones
-      await DatabaseService.executeQuery('DELETE FROM task_hazards');
+      // Only clear existing task hazards when explicitly requested (e.g., initial API fetch)
+      if (clearExisting) {
+        await DatabaseService.executeQuery('DELETE FROM task_hazards');
+      }
 
       // Insert all task hazards
       for (const taskHazard of taskHazards) {
@@ -81,18 +131,23 @@ export const TaskHazardService = {
           location: taskHazard.location || '',
           date: taskHazard.date || new Date().toISOString(),
           supervisor: taskHazard.supervisor || '',
-          hazards: JSON.stringify(taskHazard.hazards || []),
+          hazards: JSON.stringify(taskHazard.risks || taskHazard.hazards || []),
           controls: JSON.stringify(taskHazard.controls || []),
           risk_level: taskHazard.riskLevel || 'Low',
           status: taskHazard.status || 'draft',
           created_by: taskHazard.createdBy || '',
           synced: 1,
-          // Store all extra data as metadata
+          // Store all extra data as metadata including the full risks array
           metadata: JSON.stringify({
             scopeOfWork: taskHazard.scopeOfWork,
             taskName: taskHazard.taskName,
             time: taskHazard.time,
             individual: taskHazard.individual,
+            risks: taskHazard.risks || [], // Store complete risks array
+            assetSystem: taskHazard.assetSystem,
+            systemLockoutRequired: taskHazard.systemLockoutRequired,
+            trainedWorkforce: taskHazard.trainedWorkforce,
+            geoFenceLimit: taskHazard.geoFenceLimit,
             createdAt: taskHazard.createdAt,
             updatedAt: taskHazard.updatedAt,
             ...taskHazard
@@ -124,11 +179,10 @@ export const TaskHazardService = {
     try {
       // Ensure database is ready before proceeding
       if (!DatabaseService.isDatabaseReady()) {
-        console.log('Database not ready for cache read, waiting...');
         await DatabaseService.waitForDatabaseReady();
       }
 
-      const cachedTaskHazards = await DatabaseService.getAll('task_hazards');
+      const cachedTaskHazards = await DatabaseService.getAll('task_hazards', 'status != ?', ['deleted']);
       
       if (!cachedTaskHazards || cachedTaskHazards.length === 0) {
         return [];
@@ -160,6 +214,7 @@ export const TaskHazardService = {
           time: metadata.time || '',
           supervisor: cached.supervisor,
           individual: metadata.individual || '',
+          risks: metadata.risks || hazards, // Use risks from metadata, fallback to hazards
           hazards: hazards,
           controls: controls,
           riskLevel: cached.risk_level,
@@ -273,7 +328,7 @@ export const TaskHazardService = {
             location: data.location || '',
             date: data.date || new Date().toISOString(),
             supervisor: data.supervisor || '',
-            hazards: JSON.stringify(data.hazards || []),
+            hazards: JSON.stringify(data.risks || data.hazards || []),
             controls: JSON.stringify(data.controls || []),
             risk_level: data.riskLevel || 'Low',
             status: data.status || 'draft',
@@ -281,6 +336,7 @@ export const TaskHazardService = {
             synced: 0, // Mark as not synced
             metadata: JSON.stringify({
               ...data,
+              risks: data.risks || data.hazards || [], // Ensure risks are stored
               _offline: true,
               _createdOffline: new Date().toISOString()
             })
@@ -316,77 +372,52 @@ export const TaskHazardService = {
    */
   update: async (id, data) => {
     try {
-      // Try to update on server first
-      try {
+      const isOnline = await NetInfo.fetch().then(state => state.isConnected);
+      
+      if (isOnline) {
+        // Update on server
         const response = await TaskHazardApi.update(id, data);
-        
-        // Update cache
-        if (response.data) {
+        if (response && response.data) {
+          // Update cache
           await TaskHazardService.cacheTaskHazards([response.data]);
         }
-
         return response;
-      } catch (apiError) {
-        // If offline or network error, save locally
-        const isNetworkError = apiError.message?.toLowerCase().includes('network') || 
-                              apiError.message?.toLowerCase().includes('fetch') ||
-                              apiError.code === 'NETWORK_ERROR';
+      } else {
+        // Update locally when offline
+        const updateData = {
+          task_name: data.taskName || data.scopeOfWork || null,
+          location: data.location || null,
+          date: data.date || null,
+          supervisor: data.supervisor || null,
+          hazards: data.risks ? JSON.stringify(data.risks) : (data.hazards ? JSON.stringify(data.hazards) : null),
+          controls: data.controls ? JSON.stringify(data.controls) : null,
+          risk_level: data.riskLevel || null,
+          status: data.status || null,
+          created_by: data.createdBy || null,
+          metadata: JSON.stringify({
+            ...data,
+            risks: data.risks || data.hazards || [], // Ensure risks are stored
+            time: data.time,
+            individual: data.individual
+          }),
+          synced: 0,
+          updated_at: Math.floor(Date.now() / 1000)
+        };
+
+        await DatabaseService.update('task_hazards', id, updateData);
         
-        if (isNetworkError) {
-          // Check if the task hazard exists locally
-          const existingTaskHazard = await DatabaseService.getById('task_hazards', id);
-          
-          if (!existingTaskHazard) {
-            throw new Error('Task hazard not found locally. Please sync your data first.');
-          }
+        // Add to sync queue
+        await DatabaseService.insert('sync_queue', {
+          entity_type: 'task_hazard',
+          entity_id: id,
+          operation: 'update',
+          data: JSON.stringify(updateData)
+        });
 
-          // Update local database with synced = 0
-          const updatedTaskHazard = {
-            task_name: data.taskName || data.scopeOfWork || existingTaskHazard.task_name,
-            location: data.location || existingTaskHazard.location,
-            date: data.date || existingTaskHazard.date,
-            supervisor: data.supervisor || existingTaskHazard.supervisor,
-            hazards: JSON.stringify(data.hazards || []),
-            controls: JSON.stringify(data.controls || []),
-            risk_level: data.riskLevel || existingTaskHazard.risk_level,
-            status: data.status || existingTaskHazard.status,
-            created_by: data.createdBy || existingTaskHazard.created_by,
-            synced: 0, // Mark as not synced
-            updated_at: Math.floor(Date.now() / 1000),
-            metadata: JSON.stringify({
-              ...data,
-              _offline: true,
-              _updatedOffline: new Date().toISOString(),
-              _originalId: id
-            })
-          };
-
-          await DatabaseService.update('task_hazards', id, updatedTaskHazard);
-          
-          // Add to sync queue for update operation
-          await DatabaseService.addToSyncQueue('task_hazard', id, 'update', {
-            ...updatedTaskHazard,
-            id: id
-          });
-          
-          // Return a response-like object
-          return {
-            data: {
-              ...updatedTaskHazard,
-              id: id,
-              _offline: true,
-              _pendingSync: true
-            },
-            source: 'offline',
-            message: 'Updated locally - will sync when online'
-          };
-        } else {
-          // Re-throw non-network errors
-          throw apiError;
-        }
+        return { data: { id, ...updateData }, source: 'offline' };
       }
     } catch (error) {
-      console.error('Error updating task hazard:', error);
+      console.error('Error in TaskHazardService.update:', error);
       throw error;
     }
   },
@@ -396,94 +427,45 @@ export const TaskHazardService = {
    */
   delete: async (id) => {
     try {
-      // Check if it's a temp ID first - these were never on the server
-      if (id && typeof id === 'string' && id.startsWith('temp_')) {
-        // For temp IDs, just delete locally (they were never on server)
-        await DatabaseService.delete('task_hazards', id);
-        
-        // Remove from sync queue if it exists
-        await DatabaseService.executeQuery(
-          'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
-          ['task_hazard', id]
-        );
-        
-        return {
-          data: {
-            id: id,
-            status: 'deleted',
-            _offline: true,
-            _tempDeleted: true
-          },
-          source: 'offline',
-          message: 'Deleted locally (was never synced to server)'
-        };
-      }
-
-      // Try to delete on server first
-      try {
-        const response = await TaskHazardApi.delete(id);
-        
+      const isOnline = await NetInfo.fetch().then(state => state.isConnected);
+      
+      if (isOnline) {
+        // Delete from server
+        await TaskHazardApi.delete(id);
         // Remove from cache
         await DatabaseService.delete('task_hazards', id);
-
-        return response;
-      } catch (apiError) {
-        // Check if it's a "not found" error (400 or 404)
-        const isNotFoundError = apiError.status === 400 || 
-                               apiError.status === 404 ||
-                               apiError.message?.toLowerCase().includes('not found') ||
-                               apiError.message?.toLowerCase().includes('does not exist');
-        
-        // If offline, network error, or not found error, handle locally
-        const isNetworkError = apiError.message?.toLowerCase().includes('network') || 
-                              apiError.message?.toLowerCase().includes('fetch') ||
-                              apiError.code === 'NETWORK_ERROR';
-        
-        if (isNetworkError || isNotFoundError) {
-          // Check if the task hazard exists locally
-          const existingTaskHazard = await DatabaseService.getById('task_hazards', id);
-          
-          if (!existingTaskHazard) {
-            throw new Error('Task hazard not found locally. Please sync your data first.');
-          }
-
-          // For real IDs, mark as deleted locally (soft delete)
-          await DatabaseService.update('task_hazards', id, {
-            status: 'deleted',
-            synced: 0, // Mark as not synced
-            updated_at: Math.floor(Date.now() / 1000),
-            metadata: JSON.stringify({
-              ...JSON.parse(existingTaskHazard.metadata || '{}'),
-              _offline: true,
-              _deletedOffline: new Date().toISOString(),
-              _originalId: id
-            })
-          });
-          
-          // Add to sync queue for delete operation
-          await DatabaseService.addToSyncQueue('task_hazard', id, 'delete', {
-            id: id,
-            status: 'deleted'
-          });
-          
-          // Return a response-like object
-          return {
-            data: {
-              id: id,
-              status: 'deleted',
-              _offline: true,
-              _pendingSync: true
-            },
-            source: 'offline',
-            message: 'Deleted locally - will sync when online'
-          };
-        } else {
-          // Re-throw non-network errors
-          throw apiError;
+        return { success: true };
+      } else {
+        // If it's a temp ID (created offline but not yet synced), just delete it locally
+        if (id && typeof id === 'string' && id.startsWith('temp_')) {
+          await DatabaseService.delete('task_hazards', id);
+          // Also remove from sync queue if it was there
+          await DatabaseService.executeQuery(
+            'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+            ['task_hazard', id]
+          );
+          return { success: true, source: 'offline' };
         }
+        
+        // For items that exist on server, mark for deletion when offline
+        await DatabaseService.update('task_hazards', id, { 
+          synced: 0, 
+          status: 'deleted',
+          updated_at: Math.floor(Date.now() / 1000)
+        });
+        
+        // Add to sync queue
+        await DatabaseService.insert('sync_queue', {
+          entity_type: 'task_hazard',
+          entity_id: id,
+          operation: 'delete',
+          data: JSON.stringify({ id })
+        });
+
+        return { success: true, source: 'offline' };
       }
     } catch (error) {
-      console.error('Error deleting task hazard:', error);
+      console.error('Error in TaskHazardService.delete:', error);
       throw error;
     }
   },
@@ -493,96 +475,45 @@ export const TaskHazardService = {
    */
   deleteUniversal: async (id) => {
     try {
-      // Check if it's a temp ID first - these were never on the server
-      if (id && typeof id === 'string' && id.startsWith('temp_')) {
-        // For temp IDs, just delete locally (they were never on server)
-        await DatabaseService.delete('task_hazards', id);
-        
-        // Remove from sync queue if it exists
-        await DatabaseService.executeQuery(
-          'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
-          ['task_hazard', id]
-        );
-        
-        return {
-          data: {
-            id: id,
-            status: 'deleted',
-            _offline: true,
-            _tempDeleted: true
-          },
-          source: 'offline',
-          message: 'Deleted locally (was never synced to server)'
-        };
-      }
-
-      // Try to delete on server first
-      try {
-        const response = await TaskHazardApi.deleteUniversal(id);
-        
+      const isOnline = await NetInfo.fetch().then(state => state.isConnected);
+      
+      if (isOnline) {
+        // Delete from server
+        await TaskHazardApi.deleteUniversal(id);
         // Remove from cache
         await DatabaseService.delete('task_hazards', id);
-
-        return response;
-      } catch (apiError) {
-        // Check if it's a "not found" error (400 or 404)
-        const isNotFoundError = apiError.status === 400 || 
-                               apiError.status === 404 ||
-                               apiError.message?.toLowerCase().includes('not found') ||
-                               apiError.message?.toLowerCase().includes('does not exist');
-        
-        // If offline, network error, or not found error, handle locally
-        const isNetworkError = apiError.message?.toLowerCase().includes('network') || 
-                              apiError.message?.toLowerCase().includes('fetch') ||
-                              apiError.code === 'NETWORK_ERROR';
-        
-        if (isNetworkError || isNotFoundError) {
-          // Check if the task hazard exists locally
-          const existingTaskHazard = await DatabaseService.getById('task_hazards', id);
-          
-          if (!existingTaskHazard) {
-            throw new Error('Task hazard not found locally. Please sync your data first.');
-          }
-
-          // For real IDs, mark as deleted locally (soft delete)
-          await DatabaseService.update('task_hazards', id, {
-            status: 'deleted',
-            synced: 0, // Mark as not synced
-            updated_at: Math.floor(Date.now() / 1000),
-            metadata: JSON.stringify({
-              ...JSON.parse(existingTaskHazard.metadata || '{}'),
-              _offline: true,
-              _deletedOffline: new Date().toISOString(),
-              _originalId: id,
-              _universalDelete: true
-            })
-          });
-          
-          // Add to sync queue for universal delete operation
-          await DatabaseService.addToSyncQueue('task_hazard', id, 'delete_universal', {
-            id: id,
-            status: 'deleted',
-            universal: true
-          });
-          
-          // Return a response-like object
-          return {
-            data: {
-              id: id,
-              status: 'deleted',
-              _offline: true,
-              _pendingSync: true
-            },
-            source: 'offline',
-            message: 'Deleted locally - will sync when online'
-          };
-        } else {
-          // Re-throw non-network errors
-          throw apiError;
+        return { success: true };
+      } else {
+        // If it's a temp ID (created offline but not yet synced), just delete it locally
+        if (id && typeof id === 'string' && id.startsWith('temp_')) {
+          await DatabaseService.delete('task_hazards', id);
+          // Also remove from sync queue if it was there
+          await DatabaseService.executeQuery(
+            'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+            ['task_hazard', id]
+          );
+          return { success: true, source: 'offline' };
         }
+        
+        // For items that exist on server, mark for deletion when offline
+        await DatabaseService.update('task_hazards', id, { 
+          synced: 0, 
+          status: 'deleted',
+          updated_at: Math.floor(Date.now() / 1000)
+        });
+        
+        // Add to sync queue for universal delete
+        await DatabaseService.insert('sync_queue', {
+          entity_type: 'task_hazard',
+          entity_id: id,
+          operation: 'delete_universal',
+          data: JSON.stringify({ id, universal: true })
+        });
+
+        return { success: true, source: 'offline' };
       }
     } catch (error) {
-      console.error('Error deleting task hazard:', error);
+      console.error('Error in TaskHazardService.deleteUniversal:', error);
       throw error;
     }
   },
@@ -663,32 +594,15 @@ export const TaskHazardService = {
    */
   syncPendingTaskHazards: async () => {
     try {
-      // Get all unsynced task hazards
-      const unsyncedTaskHazards = await DatabaseService.getAll('task_hazards', 'synced = 0');
+      const isOnline = await NetInfo.fetch().then(state => state.isConnected);
+      if (!isOnline) {
+        return { synced: 0, message: 'Offline - sync will happen when online' };
+      }
+
+      const unsyncedTaskHazards = await DatabaseService.getAll('task_hazards', 'synced = ?', [0]);
       
       if (unsyncedTaskHazards.length === 0) {
         return { synced: 0, failed: 0 };
-      }
-
-      // Check if we're online by attempting to fetch existing data
-      let isOnline = false;
-      try {
-        await TaskHazardApi.getAll({ limit: 1 });
-        isOnline = true;
-      } catch (error) {
-        const isNetworkError = error.message?.toLowerCase().includes('network') || 
-                              error.message?.toLowerCase().includes('fetch') ||
-                              error.code === 'NETWORK_ERROR';
-        
-        if (isNetworkError) {
-          return { synced: 0, failed: 0, offline: true };
-        }
-        // If it's not a network error, we might still be online (could be auth or other error)
-        isOnline = true;
-      }
-
-      if (!isOnline) {
-        return { synced: 0, failed: 0, offline: true };
       }
       
       let syncedCount = 0;
@@ -724,11 +638,26 @@ export const TaskHazardService = {
               }
               
               // For real IDs, try to delete from server
-              // Check if it's a universal delete
-              if (metadata._universalDelete) {
-                await TaskHazardApi.deleteUniversal(localTaskHazard.id);
-              } else {
-                await TaskHazardApi.delete(localTaskHazard.id);
+              try{
+                // Check if it's a universal delete
+                if (metadata._universalDelete) {
+                  await TaskHazardApi.deleteUniversal(localTaskHazard.id);
+                } else {
+                  await TaskHazardApi.delete(localTaskHazard.id);
+                }
+              } catch (apiError) {
+                // If the item doesn't exist on server (404/400), treat as successful deletion
+                const isNotFound = apiError.status === 404 || 
+                                  apiError.status === 400 ||
+                                  apiError.message?.toLowerCase().includes('not found') ||
+                                  apiError.message?.toLowerCase().includes('does not exist');
+                
+                if (isNotFound) {
+                  // Item not found on server, removing locally
+                } else {
+                  // Re-throw if it's a different error
+                  throw apiError;
+                }
               }
               
               // Remove from local database
@@ -743,6 +672,7 @@ export const TaskHazardService = {
               syncedCount++;
             } catch (deleteError) {
               console.error(`❌ Failed to delete task hazard ${localTaskHazard.id}:`, deleteError.message);
+              console.error('Stack:', deleteError.stack);
               failedCount++;
             }
             continue;
@@ -758,65 +688,82 @@ export const TaskHazardService = {
           // Check if this is a new item (temp ID) or an update
           if (localTaskHazard.id && typeof localTaskHazard.id === 'string' && localTaskHazard.id.startsWith('temp_')) {
             // This is a new item, create it
-            const response = await TaskHazardApi.create(metadata);
+            const apiPayload = TaskHazardService.buildApiPayloadFromLocal(localTaskHazard);
             
-            if (response.data) {
-              // Delete the temp local record
-              await DatabaseService.delete('task_hazards', localTaskHazard.id);
+            // Mark as synced immediately to prevent concurrent sync from processing it again
+            await DatabaseService.update('task_hazards', localTaskHazard.id, { synced: 1 });
+            
+            try {
+              const response = await TaskHazardApi.create(apiPayload);
               
-              // Add the server version to cache
-              await TaskHazardService.cacheTaskHazards([response.data]);
-              
-              // Remove from sync queue
-              await DatabaseService.executeQuery(
-                'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
-                ['task_hazard', localTaskHazard.id]
-              );
-              
-              syncedCount++;
+              if (response && response.data) {
+                // IMPORTANT: Delete temp record and remove from sync queue FIRST to prevent duplicates
+                await DatabaseService.delete('task_hazards', localTaskHazard.id);
+                await DatabaseService.executeQuery(
+                  'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+                  ['task_hazard', localTaskHazard.id]
+                );
+                
+                // Then add the server version to cache (don't clear existing)
+                await TaskHazardService.cacheTaskHazards([response.data], false);
+                
+                syncedCount++;
+              }
+            } catch (createError) {
+              // If creation failed, revert synced flag so it can be retried
+              await DatabaseService.update('task_hazards', localTaskHazard.id, { synced: 0 });
+              throw createError;
             }
           } else {
             // This is an update to an existing item
-            const response = await TaskHazardApi.update(localTaskHazard.id, metadata);
+            const apiPayload = TaskHazardService.buildApiPayloadFromLocal(localTaskHazard);
+
+            // Mark as synced immediately to prevent concurrent sync from processing it again
+            await DatabaseService.update('task_hazards', localTaskHazard.id, { synced: 1 });
             
-            if (response.data) {
-              // Update the local record with synced flag
-              await DatabaseService.update('task_hazards', localTaskHazard.id, {
-                synced: 1,
-                updated_at: Math.floor(Date.now() / 1000)
-              });
+            try {
+              const response = await TaskHazardApi.update(localTaskHazard.id, apiPayload);
               
-              // Update cache with server version
-              await TaskHazardService.cacheTaskHazards([response.data]);
-              
-              // Remove from sync queue
-              await DatabaseService.executeQuery(
-                'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
-                ['task_hazard', localTaskHazard.id]
-              );
-              
-              syncedCount++;
+              if (response && response.data) {
+                // Update cache with server version (don't clear existing)
+                await TaskHazardService.cacheTaskHazards([response.data], false);
+                
+                // Remove from sync queue
+                await DatabaseService.executeQuery(
+                  'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+                  ['task_hazard', localTaskHazard.id]
+                );
+                
+                syncedCount++;
+              }
+            } catch (updateError) {
+              // If update failed, revert synced flag so it can be retried
+              await DatabaseService.update('task_hazards', localTaskHazard.id, { synced: 0 });
+              throw updateError;
             }
           }
         } catch (error) {
-          // Check if it's a network error - if so, device went offline during sync
-          const isNetworkError = error.message?.toLowerCase().includes('network') || 
-                                error.message?.toLowerCase().includes('fetch') ||
-                                error.code === 'NETWORK_ERROR';
-          
+          const message = error?.message?.toLowerCase?.() || '';
+          const isNetworkError = message.includes('network request failed') || message.includes('network') || message.includes('fetch');
           if (isNetworkError) {
-            // Don't count as failed - just not synced yet
+            // do not increment failed; keep pending
           } else {
-            console.error(`❌ Failed to sync task hazard ${localTaskHazard.id}:`, error.message);
+            console.error(`❌ Failed to sync task hazard ${localTaskHazard.id}:`);
+            console.error('Error:', error?.message || error);
+            console.error('Stack:', error?.stack);
             failedCount++;
           }
         }
       }
 
-      return { synced: syncedCount, failed: failedCount };
+      return { synced: syncedCount, failed: failedCount, message: `Synced ${syncedCount} task hazards` };
     } catch (error) {
       console.error('Error syncing pending task hazards:', error);
-      return { synced: 0, failed: 0, error: error.message };
+      const msg = error?.message?.toLowerCase?.() || '';
+      if (msg.includes('network')) {
+        return { synced: 0, failed: 0, offline: true, message: 'Offline - will retry' };
+      }
+      return { synced: 0, failed: 0, message: 'Sync failed', error: error.message };
     }
   },
 
@@ -825,10 +772,13 @@ export const TaskHazardService = {
    */
   getPendingCount: async () => {
     try {
-      const result = await DatabaseService.selectQuery(
-        'SELECT COUNT(*) as count FROM task_hazards WHERE synced = 0'
-      );
-      return result[0]?.count || 0;
+      // Ensure database is ready before proceeding
+      if (!DatabaseService.isDatabaseReady()) {
+        await DatabaseService.waitForDatabaseReady();
+      }
+
+      const pendingItems = await DatabaseService.getAll('task_hazards', 'synced = ?', [0]);
+      return pendingItems.length;
     } catch (error) {
       console.error('Error getting pending count:', error);
       return 0;

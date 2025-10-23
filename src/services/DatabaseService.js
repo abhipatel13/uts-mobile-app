@@ -110,6 +110,31 @@ class DatabaseService {
         );
       `);
 
+      // Approvals table for offline storage
+      await this.db.execAsync(`
+        CREATE TABLE IF NOT EXISTS approvals (
+          id TEXT PRIMARY KEY,
+          task_hazard_id TEXT NOT NULL,
+          scope_of_work TEXT,
+          location TEXT,
+          date TEXT,
+          time TEXT,
+          supervisor TEXT,
+          supervisor_email TEXT,
+          approval_status TEXT DEFAULT 'pending',
+          approval_comments TEXT,
+          approved_by TEXT,
+          approved_at TEXT,
+          signature TEXT,
+          risks TEXT,
+          individuals TEXT,
+          metadata TEXT,
+          created_at INTEGER DEFAULT (strftime('%s', 'now')),
+          updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+          synced INTEGER DEFAULT 0
+        );
+      `);
+
       // Sync queue table for tracking pending sync operations
       await this.db.execAsync(`
         CREATE TABLE IF NOT EXISTS sync_queue (
@@ -129,6 +154,9 @@ class DatabaseService {
         CREATE INDEX IF NOT EXISTS idx_assets_synced ON assets(synced);
         CREATE INDEX IF NOT EXISTS idx_task_hazards_synced ON task_hazards(synced);
         CREATE INDEX IF NOT EXISTS idx_risk_assessments_synced ON risk_assessments(synced);
+        CREATE INDEX IF NOT EXISTS idx_approvals_synced ON approvals(synced);
+        CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(approval_status);
+        CREATE INDEX IF NOT EXISTS idx_approvals_supervisor ON approvals(supervisor_email);
         CREATE INDEX IF NOT EXISTS idx_sync_queue_entity ON sync_queue(entity_type, entity_id);
       `);      
       // Run migrations to add new columns to existing tables
@@ -293,7 +321,6 @@ class DatabaseService {
   async executeQuery(sql, params = []) {
     try {
       if (!this.isDatabaseReady()) {
-        console.log('Database not ready, waiting...');
         await this.waitForDatabaseReady();
       }
       
@@ -315,7 +342,6 @@ class DatabaseService {
   async selectQuery(sql, params = []) {
     try {
       if (!this.isDatabaseReady()) {
-        console.log('Database not ready for select, waiting...');
         await this.waitForDatabaseReady();
       }
       
@@ -501,6 +527,7 @@ class DatabaseService {
         DELETE FROM assets;
         DELETE FROM task_hazards;
         DELETE FROM risk_assessments;
+        DELETE FROM approvals;
         DELETE FROM sync_queue;
       `);
     } catch (error) {

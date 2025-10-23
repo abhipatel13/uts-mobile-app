@@ -143,6 +143,8 @@ export default function CustomDrawerContent(props) {
             source={require('../../assets/uts-logo.png')} 
             style={styles.logoImage}
             resizeMode="contain"
+            fadeDuration={0}
+            backgroundColor="transparent"
           />
         </View>
       </View>
@@ -271,6 +273,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginHorizontal: 10,
+    minHeight: 80,
   },
   logoImage: {
     width: 160,

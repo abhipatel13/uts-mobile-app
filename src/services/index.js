@@ -10,6 +10,7 @@ export { AssetHierarchyService } from './AssetHierarchyService';
 export { TaskHazardApi } from './TaskHazardApi';
 export { TaskHazardService } from './TaskHazardService';
 export { RiskAssessmentApi } from './RiskAssessmentApi';
+export { ApprovalService } from './ApprovalService';
 export { UserApi } from './UserApi';
 export { UserService } from './UserService';
 export { default as DatabaseService } from './DatabaseService';

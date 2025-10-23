@@ -15,9 +15,10 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TaskHazardApi } from '../services';
+import { ApprovalService } from '../services';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SignatureModal from '../components/SignatureModal';
+import NetInfo from '@react-native-community/netinfo';
 
 const ApprovalRequestsScreen = () => {
   const [approvalRequests, setApprovalRequests] = useState([]);
@@ -32,6 +33,8 @@ const ApprovalRequestsScreen = () => {
   const [comments, setComments] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [dataSource, setDataSource] = useState('api');
 
   const statusOptions = [
     { value: 'pending', label: 'Pending Approval', color: '#f59e0b' },
@@ -42,6 +45,7 @@ const ApprovalRequestsScreen = () => {
 
   useEffect(() => {
     loadCurrentUser();
+    setupNetworkListener();
   }, []);
 
   useEffect(() => {
@@ -49,6 +53,19 @@ const ApprovalRequestsScreen = () => {
       fetchApprovalRequests();
     }
   }, [selectedStatus, currentUser]);
+
+  const setupNetworkListener = () => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOffline(!state.isConnected);
+    });
+
+    // Initial check
+    NetInfo.fetch().then(state => {
+      setIsOffline(!state.isConnected);
+    });
+
+    return unsubscribe;
+  };
 
   const loadCurrentUser = async () => {
     try {
@@ -71,7 +88,7 @@ const ApprovalRequestsScreen = () => {
       }
       setError(null);
 
-      const params = {};
+      const params = { includeInvalidated: true };
       if (selectedStatus !== 'all') {
         params.status = selectedStatus;
       }
@@ -82,27 +99,26 @@ const ApprovalRequestsScreen = () => {
       }
 
       let allRequests = [];
+      let source = 'api';
       
       try {
-        // First try to get approval-specific data
-        const response = await TaskHazardApi.getApprovals({includeInvalidated: true});
-
-        console.log('Approval API response:', response);
-        const data = response.data || {};
-        allRequests = data.taskHazards || [];
-        console.log('Approval API taskHazards:', allRequests.ap);
-      } catch (approvalError) {
-        console.warn('Approval API failed, falling back to all task hazards:', approvalError);
+        // Use ApprovalService which handles offline mode automatically
+        const response = await ApprovalService.getApprovals(params);
+        allRequests = response.data || [];
+        source = response.source || 'api';
         
-        // Fallback: Get all task hazards and filter locally
-        try {
-          const { TaskHazardService } = await import('../services/TaskHazardService');
-          const allTaskHazardsResponse = await TaskHazardService.getAll();
-          allRequests = allTaskHazardsResponse.data || [];
-        } catch (fallbackError) {
-          console.error('Fallback also failed:', fallbackError);
-          throw fallbackError;
+        setDataSource(source);
+        
+        if (source === 'cache') {
+          // Show info that we're in offline mode
+          if (isRefresh && allRequests.length > 0) {
+            // Don't show alert on refresh if we have cached data
+            console.log('Using cached approval data (offline mode)');
+          }
         }
+      } catch (approvalError) {
+        console.error('Error fetching approvals:', approvalError);
+        throw approvalError;
       }
     
       // Filter requests where current user is the supervisor and approval is required
@@ -114,9 +130,7 @@ const ApprovalRequestsScreen = () => {
         // Check if supervisor info is in the approvals array
         if (request.approvals && request.approvals.length > 0) {
           const latestApproval = request.approvals.find(approval => approval.isLatest) || request.approvals[0];
-          console.log('Latest approval:', latestApproval);
           if (latestApproval && latestApproval.supervisor) {
-            console.log('Approval supervisor object:', latestApproval.supervisor);
             supervisorEmail = latestApproval.supervisor.email || latestApproval.supervisor;
             supervisorId = latestApproval.supervisor.id || latestApproval.supervisor._id;
           }
@@ -137,7 +151,7 @@ const ApprovalRequestsScreen = () => {
             supervisorEmail = metadata.supervisor || metadata.supervisorEmail;
             supervisorId = metadata.supervisorId;
           } catch (e) {
-            console.log('Error parsing metadata:', e);
+            // Error parsing metadata
           }
         }
         
@@ -149,12 +163,6 @@ const ApprovalRequestsScreen = () => {
             supervisorId = latestApproval.taskHazardData.supervisorId;
           }
         }
-        
-        console.log('Request ID:', request.id);
-        console.log('Full request structure:', JSON.stringify(request, null, 2));
-        console.log('Supervisor email:', supervisorEmail);
-        console.log('Supervisor ID:', supervisorId);
-        console.log('Current user email:', currentUser.email);
         
         // Only show requests where current user is the assigned supervisor
         const isAssignedSupervisor = supervisorEmail === currentUser.email || 
@@ -169,26 +177,24 @@ const ApprovalRequestsScreen = () => {
                                 request.approvalRequired ||
                                 (request.approvals && request.approvals.some(approval => approval.status === 'pending'));
         
-        console.log('Is assigned supervisor:', isAssignedSupervisor);
-        console.log('Requires approval:', requiresApproval);
-        
         return isAssignedSupervisor && requiresApproval;
       });
     
       setApprovalRequests(filteredRequests);
-      
-      // Debug information
-      console.log(`Found ${allRequests.length} total requests, ${filteredRequests.length} for supervisor ${currentUser.email}`);
 
     } catch (error) {
       console.error('Error fetching approval requests:', error);
       setError(error.message || 'Failed to load approval requests. Please try again.');
+      setDataSource('error');
       
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to load approval requests. Please try again.',
-        [{ text: 'OK' }]
-      );
+      // Don't show alert for network errors if we tried to refresh
+      if (!isRefresh || !error.message?.includes('offline')) {
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to load approval requests. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -207,11 +213,6 @@ const ApprovalRequestsScreen = () => {
   };
 
   const handleApproveWithSignature = async (signature) => {
-    console.log('handleApproveWithSignature called with signature:', signature);
-    console.log('selectedRequest:', selectedRequest);
-    console.log('selectedRequest.id:', selectedRequest?.id);
-    console.log('selectedRequest._id:', selectedRequest?._id);
-    
     if (!selectedRequest?.id && !selectedRequest?._id) {
       throw new Error('Task hazard ID is missing');
     }
@@ -238,16 +239,16 @@ const ApprovalRequestsScreen = () => {
         approvedAt: new Date().toISOString()
       };
       
-      console.log('Sending approval data:', approvalData);
-      console.log('Task Hazard ID:', safeTaskHazardId);
-      console.log('Task Hazard ID type:', typeof safeTaskHazardId);
-      
-      const response = await TaskHazardApi.processApproval(safeTaskHazardId, approvalData);
-      console.log('Approval response:', response);
+      const response = await ApprovalService.processApproval(safeTaskHazardId, approvalData);
 
+      // Check if it was saved offline
+      const savedOffline = response.source === 'offline';
+      
       Alert.alert(
         'Success',
-        'Task hazard approved successfully!',
+        savedOffline 
+          ? 'Task hazard approved and saved offline. Will sync when online.' 
+          : 'Task hazard approved successfully!',
         [{ text: 'OK' }]
       );
 
@@ -269,7 +270,7 @@ const ApprovalRequestsScreen = () => {
       if (isNetworkError) {
         Alert.alert(
           'Network Error',
-          'Unable to connect to the server. Please check your internet connection and try again.',
+          'Unable to process approval. Please check your internet connection and try again.',
           [{ text: 'OK' }]
         );
       } else {
@@ -285,11 +286,6 @@ const ApprovalRequestsScreen = () => {
   };
 
   const handleRejectWithSignature = async (signature) => {
-    console.log('handleRejectWithSignature called with signature:', signature);
-    console.log('selectedRequest:', selectedRequest);
-    console.log('selectedRequest.id:', selectedRequest?.id);
-    console.log('selectedRequest._id:', selectedRequest?._id);
-    
     if (!selectedRequest?.id && !selectedRequest?._id) {
       throw new Error('Task hazard ID is missing');
     }
@@ -316,16 +312,16 @@ const ApprovalRequestsScreen = () => {
         rejectedAt: new Date().toISOString()
       };
       
-      console.log('Sending rejection data:', rejectionData);
-      console.log('Task Hazard ID:', safeTaskHazardId);
-      console.log('Task Hazard ID type:', typeof safeTaskHazardId);
-      
-      const response = await TaskHazardApi.processApproval(safeTaskHazardId, rejectionData);
-      console.log('Rejection response:', response);
+      const response = await ApprovalService.processApproval(safeTaskHazardId, rejectionData);
 
+      // Check if it was saved offline
+      const savedOffline = response.source === 'offline';
+      
       Alert.alert(
         'Success',
-        'Task hazard rejected successfully!',
+        savedOffline 
+          ? 'Task hazard rejected and saved offline. Will sync when online.' 
+          : 'Task hazard rejected successfully!',
         [{ text: 'OK' }]
       );
 
@@ -347,7 +343,7 @@ const ApprovalRequestsScreen = () => {
       if (isNetworkError) {
         Alert.alert(
           'Network Error',
-          'Unable to connect to the server. Please check your internet connection and try again.',
+          'Unable to process rejection. Please check your internet connection and try again.',
           [{ text: 'OK' }]
         );
       } else {
@@ -668,6 +664,16 @@ const ApprovalRequestsScreen = () => {
             )}
           </TouchableOpacity>
         </View>
+        
+        {/* Offline Indicator */}
+        {(isOffline || dataSource === 'cache') && (
+          <View style={styles.offlineIndicator}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
+            <Text style={styles.offlineText}>
+              {isOffline ? 'Offline Mode - ' : ''}Showing cached data
+            </Text>
+          </View>
+        )}
         
         {/* Status Filter */}
         <View style={styles.filterContainer}>
@@ -1021,6 +1027,21 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 12,
+    gap: 8,
+  },
+  offlineText: {
+    fontSize: 14,
+    color: '#92400e',
     fontWeight: '500',
   },
   // Modal Styles

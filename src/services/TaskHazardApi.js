@@ -46,7 +46,6 @@ export const TaskHazardApi = {
 
   // Process approval (approve/reject)
   processApproval: async (taskHazardId, data) => {
-    console.log('TaskHazardApi.processApproval called with:', { taskHazardId, data });
     try {
       // Ensure taskHazardId is a string and not undefined
       const safeTaskHazardId = String(taskHazardId);
@@ -61,22 +60,15 @@ export const TaskHazardApi = {
         id: safeTaskHazardId
       };
       
-      console.log('Sending request data:', requestData);
-      console.log('Task Hazard ID type:', typeof safeTaskHazardId);
-      console.log('Task Hazard ID value:', safeTaskHazardId);
-      
       const approvalUrl = `/api/task-hazards/${safeTaskHazardId}/approval`;
-      console.log('Approval URL:', approvalUrl);
       
       // Try PUT first, if it fails, try POST
       let response;
       try {
         response = await api.put(approvalUrl, requestData);
       } catch (putError) {
-        console.log('PUT request failed, trying POST:', putError.message);
         response = await api.post(approvalUrl, requestData);
       }
-      console.log('TaskHazardApi.processApproval response:', response);
       return response;
     } catch (error) {
       console.error('TaskHazardApi.processApproval error:', error);
