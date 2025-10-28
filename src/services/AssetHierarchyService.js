@@ -117,32 +117,36 @@ export const AssetHierarchyService = {
             }
           }
 
-          try {
-            // Use INSERT OR REPLACE to handle both UNIQUE and FOREIGN KEY constraints
-            await DatabaseService.executeQuery(`
-              INSERT OR REPLACE INTO assets 
-              (id, name, type, parent_id, hierarchy_path, metadata, synced, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-              assetData.id,
-              assetData.name,
-              assetData.type,
-              assetData.parent_id,
-              assetData.hierarchy_path,
-              assetData.metadata,
-              assetData.synced,
-              Math.floor(Date.now() / 1000),
-              Math.floor(Date.now() / 1000)
-            ]);
-          } catch (insertError) {
-            // If insert fails (duplicate), try update
-            if (insertError.message.includes('UNIQUE constraint failed')) {
-              try {
-                await DatabaseService.update('assets', assetData.id, assetData);
-              } catch (updateError) {
-                console.error('Error updating asset:', assetData.id, updateError);
-              }
-            } else if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
+          // First check if asset already exists
+          const existingAsset = await DatabaseService.getById('assets', assetData.id);
+          
+          if (existingAsset) {
+            // Asset exists, update it
+            try {
+              await DatabaseService.update('assets', assetData.id, assetData);
+            } catch (updateError) {
+              console.error('Error updating existing asset:', assetData.id, updateError);
+            }
+          } else {
+            // Asset doesn't exist, try to insert it
+            try {
+              await DatabaseService.executeQuery(`
+                INSERT INTO assets 
+                (id, name, type, parent_id, hierarchy_path, metadata, synced, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `, [
+                assetData.id,
+                assetData.name,
+                assetData.type,
+                assetData.parent_id,
+                assetData.hierarchy_path,
+                assetData.metadata,
+                assetData.synced,
+                Math.floor(Date.now() / 1000),
+                Math.floor(Date.now() / 1000)
+              ]);
+            } catch (insertError) {
+              if (insertError.message.includes('FOREIGN KEY constraint failed') && assetData.parent_id) {
               // If foreign key constraint fails, create a placeholder parent
               const parentExists = await DatabaseService.getById('assets', assetData.parent_id);
               if (!parentExists) {
@@ -197,6 +201,7 @@ export const AssetHierarchyService = {
             } else {
               console.error('Error inserting asset:', assetData.id, insertError);
             }
+          }
           }
         }
 

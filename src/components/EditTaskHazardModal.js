@@ -37,7 +37,7 @@ const EditTaskHazardModal = ({
     systemLockoutRequired: false,
     trainedWorkforce: false,
     supervisor: '',
-    individual: '',
+    individual: [],
     location: '',
     status: 'Pending',
     geoFenceLimit: '200',
@@ -82,7 +82,7 @@ const EditTaskHazardModal = ({
         systemLockoutRequired: taskHazard.systemLockoutRequired || false,
         trainedWorkforce: taskHazard.trainedWorkforce || false,
         supervisor: taskHazard.supervisor || '',
-        individual: taskHazard.individual || '',
+        individual: taskHazard.individual ? taskHazard.individual.split(', ').filter(email => email.trim()) : [],
         location: taskHazard.location || '',
         status: taskHazard.status || 'Pending',
         geoFenceLimit: taskHazard.geoFenceLimit?.toString() || '200',
@@ -107,7 +107,7 @@ const EditTaskHazardModal = ({
       systemLockoutRequired: false,
       trainedWorkforce: false,
       supervisor: '',
-      individual: '',
+      individual: [],
       location: '',
       status: 'Pending',
       geoFenceLimit: '200',
@@ -191,8 +191,8 @@ const EditTaskHazardModal = ({
       : 1;
 
     // Create a complete task hazard object for map display
-    const taskHazard = {
-      id: taskHazardData?.id || 'preview-' + Date.now(), // Use existing ID or temporary ID
+    const taskHazardForMap = {
+      id: taskHazard?.id || 'preview-' + Date.now(), // Use existing ID or temporary ID
       date: formData.date,
       time: formData.time,
       scopeOfWork: formData.scopeOfWork,
@@ -215,7 +215,7 @@ const EditTaskHazardModal = ({
       riskScore: Math.round(avgRiskScore),
     };
 
-    return [taskHazard];
+    return [taskHazardForMap];
   };
 
   const validateStep = (step) => {
@@ -234,7 +234,7 @@ const EditTaskHazardModal = ({
       if (!formData.supervisor.trim()) {
         newErrors.supervisor = 'Supervisor is required';
       }
-      if (!formData.individual.trim()) {
+      if (formData.individual.length === 0) {
         newErrors.individual = 'At least one individual is required';
       }
     } else if (step === 3) {
@@ -286,19 +286,40 @@ const EditTaskHazardModal = ({
 
   const showIndividualPicker = (individuals) => {
     if (Platform.OS === 'ios' && individuals.length > 0) {
-      const options = ['Cancel', ...individuals.map(user => `${user.name || 'No Name'} (${user.email})`)];
+      const options = ['Cancel', 'Select All', 'Clear All', ...individuals.map(user => `${user.name || 'No Name'} (${user.email})`)];
       const cancelButtonIndex = 0;
+      const selectAllIndex = 1;
+      const clearAllIndex = 2;
       
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
           cancelButtonIndex,
-          title: 'Select Individual',
+          title: 'Select Individuals',
         },
         (buttonIndex) => {
-          if (buttonIndex !== cancelButtonIndex) {
-            const selectedIndividual = individuals[buttonIndex - 1];
-            handleInputChange('individual', selectedIndividual.email);
+          if (buttonIndex === selectAllIndex) {
+            // Select all individuals
+            const allEmails = individuals.map(user => user.email);
+            handleInputChange('individual', allEmails);
+          } else if (buttonIndex === clearAllIndex) {
+            // Clear all selections
+            handleInputChange('individual', []);
+          } else if (buttonIndex > clearAllIndex) {
+            // Toggle individual selection
+            const selectedIndividual = individuals[buttonIndex - 3];
+            const currentIndividuals = [...formData.individual];
+            const index = currentIndividuals.indexOf(selectedIndividual.email);
+            
+            if (index > -1) {
+              // Remove if already selected
+              currentIndividuals.splice(index, 1);
+            } else {
+              // Add if not selected
+              currentIndividuals.push(selectedIndividual.email);
+            }
+            
+            handleInputChange('individual', currentIndividuals);
           }
         }
       );
@@ -334,9 +355,14 @@ const EditTaskHazardModal = ({
   };
 
   const getIndividualDisplayText = (individuals) => {
-    if (!formData.individual) return 'Select individual...';
-    const individual = individuals.find(user => user.email === formData.individual);
-    return individual ? `${individual.name || 'No Name'} (${individual.email})` : 'Select individual...';
+    if (!formData.individual || formData.individual.length === 0) return 'Select individuals...';
+    
+    if (formData.individual.length === 1) {
+      const individual = individuals.find(user => user.email === formData.individual[0]);
+      return individual ? `${individual.name || 'No Name'} (${individual.email})` : 'Select individuals...';
+    } else {
+      return `${formData.individual.length} individuals selected`;
+    }
   };
 
   const nextStep = () => {
@@ -369,7 +395,7 @@ const EditTaskHazardModal = ({
       assetSystem: formData.assetSystem.trim() || null,
       systemLockoutRequired: formData.systemLockoutRequired,
       trainedWorkforce: formData.trainedWorkforce,
-      individual: formData.individual.trim(),
+      individual: formData.individual.join(', '),
       supervisor: formData.supervisor.trim(),
       location: formData.location.trim(),
       status: formData.status,
@@ -571,7 +597,7 @@ const EditTaskHazardModal = ({
 
         {/* Individuals */}
         <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Individual Email *</Text>
+          <Text style={styles.label}>Individual Emails *</Text>
           {isLoadingUsers ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#374151" />
@@ -584,7 +610,7 @@ const EditTaskHazardModal = ({
             >
               <Text style={[
                 styles.iosPickerText, 
-                !formData.individual && styles.iosPickerPlaceholder
+                (!formData.individual || formData.individual.length === 0) && styles.iosPickerPlaceholder
               ]}>
                 {getIndividualDisplayText(individuals)}
               </Text>
@@ -593,11 +619,15 @@ const EditTaskHazardModal = ({
           ) : (
             <View style={styles.pickerContainer}>
               <Picker
-                selectedValue={formData.individual}
-                onValueChange={(value) => handleInputChange('individual', value)}
+                selectedValue=""
+                onValueChange={(value) => {
+                  if (value && !formData.individual.includes(value)) {
+                    handleInputChange('individual', [...formData.individual, value]);
+                  }
+                }}
                 style={styles.picker}
               >
-                <Picker.Item label="Select individual..." value="" />
+                <Picker.Item label="Add individual..." value="" />
                 {individuals.map((user) => (
                   <Picker.Item 
                     key={user.id} 
@@ -608,8 +638,35 @@ const EditTaskHazardModal = ({
               </Picker>
             </View>
           )}
+          
+          {/* Selected Individuals Display */}
+          {formData.individual && formData.individual.length > 0 && (
+            <View style={styles.selectedIndividualsContainer}>
+              <Text style={styles.selectedIndividualsLabel}>Selected Individuals:</Text>
+              {formData.individual.map((email, index) => {
+                const user = individuals.find(u => u.email === email);
+                return (
+                  <View key={index} style={styles.selectedIndividualItem}>
+                    <Text style={styles.selectedIndividualText}>
+                      {user ? `${user.name || 'No Name'} (${user.email})` : email}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.removeIndividualButton}
+                      onPress={() => {
+                        const updatedIndividuals = formData.individual.filter((_, i) => i !== index);
+                        handleInputChange('individual', updatedIndividuals);
+                      }}
+                    >
+                      <Ionicons name="close-circle" size={20} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+          
           <Text style={styles.helpText}>
-            Select team member from your company
+            Select team members from your company
           </Text>
           {errors.individual && <Text style={styles.errorText}>{errors.individual}</Text>}
         </View>
@@ -1069,6 +1126,40 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: '#6b7280',
     fontSize: 14,
+  },
+  selectedIndividualsContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  selectedIndividualsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  selectedIndividualItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  selectedIndividualText: {
+    fontSize: 14,
+    color: '#374151',
+    flex: 1,
+  },
+  removeIndividualButton: {
+    padding: 4,
   },
 });
 
