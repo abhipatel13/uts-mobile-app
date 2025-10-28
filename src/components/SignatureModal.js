@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getRiskScoreLabel } from '../utils/riskUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -89,7 +90,7 @@ const SignatureModal = ({
                 Date: {taskHazard.date}
               </Text>
               <Text style={styles.taskDetails}>
-                Risk Level: {taskHazard.riskLevel || 'Not specified'}
+                Risk Level: {taskHazard.riskLevel ? getRiskScoreLabel(taskHazard.riskLevel) : 'Not specified'}
               </Text>
             </View>
           )}

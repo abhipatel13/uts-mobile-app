@@ -2,6 +2,7 @@ import { TaskHazardApi } from './TaskHazardApi';
 import DatabaseService from './DatabaseService';
 import { ApiError } from '../lib/api-client';
 import NetInfo from '@react-native-community/netinfo';
+import { AuthService } from './AuthService';
 
 /**
  * Hybrid Task Hazard Service
@@ -62,6 +63,20 @@ export const TaskHazardService = {
    */
   getAll: async (params = {}) => {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        console.warn('TaskHazardService: User not authenticated, skipping API calls');
+        // Return cached data only
+        const cachedTaskHazards = await TaskHazardService.getTaskHazardsFromCache();
+        return {
+          data: cachedTaskHazards,
+          source: 'cache',
+          cached: true,
+          offline: true
+        };
+      }
+
       // Ensure database is ready before proceeding
       if (!DatabaseService.isDatabaseReady()) {
         await DatabaseService.waitForDatabaseReady();
@@ -81,7 +96,13 @@ export const TaskHazardService = {
           cached: true
         };
       } catch (apiError) {
-        // Fall through to cache
+        // Check if it's an authentication error - if so, re-throw it to trigger logout
+        if (apiError.code === 'AUTH_EXPIRED' || apiError.status === 401) {
+          console.warn('Authentication expired - user will be logged out');
+          throw apiError;
+        }
+        
+        // Fall through to cache for other errors
         const cachedTaskHazards = await TaskHazardService.getTaskHazardsFromCache();
         
         if (cachedTaskHazards.length === 0) {
@@ -247,6 +268,12 @@ export const TaskHazardService = {
           source: 'api'
         };
       } catch (apiError) {
+        // Check if it's an authentication error - if so, re-throw it to trigger logout
+        if (apiError.code === 'AUTH_EXPIRED' || apiError.status === 401) {
+          console.warn('Authentication expired - user will be logged out');
+          throw apiError;
+        }
+        
         console.warn('API fetch failed, loading from cache:', apiError.message);
         
         // Load from cache
@@ -301,6 +328,12 @@ export const TaskHazardService = {
    */
   create: async (data) => {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       // Try to create on server first
       try {
         const response = await TaskHazardApi.create(data);
@@ -372,6 +405,12 @@ export const TaskHazardService = {
    */
   update: async (id, data) => {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {
@@ -427,6 +466,12 @@ export const TaskHazardService = {
    */
   delete: async (id) => {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {
@@ -475,6 +520,12 @@ export const TaskHazardService = {
    */
   deleteUniversal: async (id) => {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {

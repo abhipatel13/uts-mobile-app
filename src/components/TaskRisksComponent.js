@@ -440,11 +440,6 @@ const TaskRisksComponent = ({ risks = [], onRisksChange, context = 'riskAssessme
                 >
                   {risk.riskType && asIsScore > 0 ? (
                     <View style={[styles.associatedRisksSelected, { backgroundColor: getRiskScoreColor(asIsScore, risk.riskType) }]}>
-                      <View style={styles.associatedRisksInfo}>
-                        <Text style={styles.associatedRisksTitle}>
-                          {risk.asIsLikelihood} and {risk.asIsConsequence}
-                        </Text>
-                      </View>
                       <View style={styles.riskScoreBadge}>
                         <Text style={styles.riskScoreText}>Score {asIsScore}</Text>
                       </View>
@@ -519,20 +514,7 @@ const TaskRisksComponent = ({ risks = [], onRisksChange, context = 'riskAssessme
                 >
                   {risk.mitigatingActionType && mitigatedScore > 0 ? (
                     <View style={styles.postMitigationSelected}>
-                      {mitigatedScore > 9 && (
-                        <View style={styles.supervisorSignatureWarning}>
-                          <Ionicons name="warning" size={16} color="#f59e0b" />
-                          <Text style={styles.supervisorSignatureText}>
-                            Supervisor Signature Required
-                          </Text>
-                        </View>
-                      )}
                       <View style={[styles.postMitigationInfo, { backgroundColor: getRiskScoreColor(mitigatedScore, risk.riskType) }]}>
-                        <View style={styles.mitigatedRiskDetails}>
-                          <Text style={styles.mitigatedRiskTitle}>
-                            {risk.mitigatedLikelihood} and {risk.mitigatedConsequence}
-                          </Text>
-                        </View>
                         <View style={styles.riskScoreBadge}>
                           <Text style={styles.riskScoreText}>Score {mitigatedScore}</Text>
                         </View>
@@ -709,13 +691,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   riskScoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 12,
   },
   riskScoreText: {
     color: '#000000',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   removeRiskButton: {
@@ -837,25 +819,29 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
     borderRadius: 6,
     backgroundColor: '#fff',
-    minHeight: 80,
+    minHeight: 40,
     overflow: 'hidden',
   },
   associatedRisksSelected: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    minHeight: 80,
+    padding: 8,
+    minHeight: 40,
+    flexWrap: 'nowrap',
   },
   associatedRisksInfo: {
     flex: 1,
+    flexGrow: 1,
+    flexBasis: 0,
     marginRight: 8,
   },
   associatedRisksTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#000000',
-    flexWrap: 'wrap',
+    lineHeight: 20,
+    flexShrink: 1,
   },
   associatedRisksSubtitle: {
     fontSize: 12,
@@ -865,7 +851,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   chevronIcon: {
-    marginLeft: 8,
+    marginLeft: 6,
   },
   associatedRisksPlaceholder: {
     flex: 1,
@@ -889,7 +875,7 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
     borderRadius: 6,
     backgroundColor: '#fff',
-    minHeight: 120,
+    minHeight: 40,
     overflow: 'hidden',
   },
   postMitigationSelected: {
@@ -913,18 +899,21 @@ const styles = StyleSheet.create({
   postMitigationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    minHeight: 80,
+    padding: 8,
+    minHeight: 40,
   },
   mitigatedRiskDetails: {
     flex: 1,
+    flexGrow: 1,
+    flexBasis: 0,
     marginRight: 8,
   },
   mitigatedRiskTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#000000',
-    flexWrap: 'wrap',
+    lineHeight: 20,
+    flexShrink: 1,
   },
   mitigatedRiskSubtitle: {
     fontSize: 12,

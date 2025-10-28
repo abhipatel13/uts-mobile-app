@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getRiskScoreLabel, getRiskColor } from '../utils/riskUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,21 +47,32 @@ const RiskAssessmentDetailsModal = ({
     return [];
   })();
 
-  // Calculate highest risk score
-  const calculateHighestRiskScore = (risks) => {
-    if (!risks || risks.length === 0) return 1;
+  // Calculate highest risk score and get the risk details
+  const calculateHighestRiskData = (risks) => {
+    if (!risks || risks.length === 0) return { risk: { asIsLikelihood: 'Very Unlikely', asIsConsequence: 'Minor' }, score: 1 };
     
-    return Math.max(...risks.map(risk => {
+    let highestRisk = risks[0];
+    let highestScore = 1;
+    
+    risks.forEach(risk => {
+      let currentScore = 1;
       // Handle different risk score calculation methods
-      if (risk.asIsScore) return risk.asIsScore;
-      if (risk.asIsLikelihood && risk.asIsConsequence) {
+      if (risk.asIsScore) {
+        currentScore = risk.asIsScore;
+      } else if (risk.asIsLikelihood && risk.asIsConsequence) {
         // Convert likelihood and consequence to numeric values if they're strings
         const likelihoodScore = getLikelihoodScore(risk.asIsLikelihood);
         const consequenceScore = getConsequenceScore(risk.asIsConsequence);
-        return likelihoodScore * consequenceScore;
+        currentScore = likelihoodScore * consequenceScore;
       }
-      return 1;
-    }));
+      
+      if (currentScore > highestScore) {
+        highestScore = currentScore;
+        highestRisk = risk;
+      }
+    });
+    
+    return { risk: highestRisk, score: highestScore };
   };
 
   const getLikelihoodScore = (likelihood) => {
@@ -85,7 +97,8 @@ const RiskAssessmentDetailsModal = ({
     return scores[consequence] || parseInt(consequence) || 1;
   };
 
-  const highestRisk = calculateHighestRiskScore(riskAssessment.risks);
+  const highestRiskData = calculateHighestRiskData(riskAssessment.risks);
+  const highestRisk = highestRiskData.score;
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -154,13 +167,18 @@ const RiskAssessmentDetailsModal = ({
         
         <View style={styles.riskIndicator}>
           <View style={styles.riskRow}>
-            <Text style={styles.riskLabel}>Highest Risk Score:</Text>
+            <Text style={styles.riskLabel}>Highest Risk:</Text>
             <View style={[
               styles.riskBadge,
               { backgroundColor: getRiskColor ? getRiskColor(highestRisk) : '#6b7280' }
             ]}>
-              <Text style={styles.riskScore}>{highestRisk}</Text>
+              <Text style={styles.riskScore}>{getRiskScoreLabel(highestRisk)}</Text>
             </View>
+          </View>
+          <View style={styles.riskDetailsRow}>
+            <Text style={styles.riskDetailsText}>
+              Likelihood: {highestRiskData.risk.asIsLikelihood || 'Not specified'} | Consequence: {highestRiskData.risk.asIsConsequence || 'Not specified'}
+            </Text>
           </View>
         </View>
       </View>
@@ -239,8 +257,8 @@ const RiskAssessmentDetailsModal = ({
               <Ionicons name="speedometer-outline" size={24} color={getRiskColor ? getRiskColor(highestRisk) : '#6b7280'} />
             </View>
             <View style={styles.summaryInfo}>
-              <Text style={styles.summaryValue}>{highestRisk}</Text>
-              <Text style={styles.summaryLabel}>Highest Score</Text>
+              <Text style={styles.summaryValue}>{getRiskScoreLabel(highestRisk)}</Text>
+              <Text style={styles.summaryLabel}>Highest Risk</Text>
             </View>
           </View>
         </View>
@@ -278,7 +296,7 @@ const RiskAssessmentDetailsModal = ({
         <View>
           <View style={styles.risksHeader}>
             <Text style={styles.risksTitle}>Risk Analysis ({riskCount})</Text>
-            <Text style={styles.risksSubtitle}>Highest Risk Score: {highestRisk}</Text>
+            <Text style={styles.risksSubtitle}>Highest Risk: {getRiskScoreLabel(highestRisk)}</Text>
           </View>
           
           {riskAssessment.risks.map((risk, index) => {
@@ -303,7 +321,10 @@ const RiskAssessmentDetailsModal = ({
                       styles.riskScoreBadge,
                       { backgroundColor: getRiskColor ? getRiskColor(asIsScore) : '#6b7280' }
                     ]}>
-                      <Text style={styles.riskScoreText}>{asIsScore}</Text>
+                      <Text style={styles.riskDetailsText}>
+                        {risk.asIsLikelihood || 'Not specified'} and {risk.asIsConsequence || 'Not specified'}
+                      </Text>
+                      <Text style={styles.riskScoreText}>Score {asIsScore}</Text>
                     </View>
                   </View>
                 </View>
@@ -390,14 +411,19 @@ const RiskAssessmentDetailsModal = ({
                         </Text>
                       </View>
                     </View>
-                  </View>
-                )}
-
-                {/* Supervisor Signature Required */}
-                {risk.requiresSupervisorSignature && (
-                  <View style={styles.signatureRequiredContainer}>
-                    <Ionicons name="checkmark-circle" size={16} color="#f59e0b" />
-                    <Text style={styles.signatureRequiredText}>Supervisor signature required</Text>
+                    
+                    {/* Post-Mitigation Risk Badge */}
+                    <View style={styles.postMitigationBadge}>
+                      <View style={[
+                        styles.riskScoreBadge,
+                        { backgroundColor: getRiskColor ? getRiskColor(mitigatedScore) : '#6b7280' }
+                      ]}>
+                        <Text style={styles.riskDetailsText}>
+                          {risk.mitigatedLikelihood || 'Not specified'} and {risk.mitigatedConsequence || 'Not specified'}
+                        </Text>
+                        <Text style={styles.riskScoreText}>Score {mitigatedScore}</Text>
+                      </View>
+                    </View>
                   </View>
                 )}
               </View>
@@ -598,6 +624,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  riskDetailsRow: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  riskDetailsText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
   sectionCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -728,16 +765,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   riskScoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
     alignItems: 'center',
   },
   riskScoreText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  postMitigationBadge: {
+    marginTop: 12,
+    alignItems: 'center',
   },
   riskTypeContainer: {
     flexDirection: 'row',

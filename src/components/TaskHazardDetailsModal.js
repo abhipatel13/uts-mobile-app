@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getRiskScoreLabel, getRiskColor } from '../utils/riskUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -44,10 +45,16 @@ const TaskHazardDetailsModal = ({
     return [];
   })();
 
-  // Calculate highest risk score
-  const highestRisk = taskHazard.risks && taskHazard.risks.length > 0
-    ? Math.max(...taskHazard.risks.map(risk => risk.asIsLikelihood * risk.asIsConsequence))
-    : 1;
+  // Calculate highest risk score and get the risk details
+  const highestRiskData = taskHazard.risks && taskHazard.risks.length > 0
+    ? taskHazard.risks.reduce((highest, risk) => {
+        const currentScore = risk.asIsLikelihood * risk.asIsConsequence;
+        const highestScore = highest.asIsLikelihood * highest.asIsConsequence;
+        return currentScore > highestScore ? risk : highest;
+      })
+    : { asIsLikelihood: 1, asIsConsequence: 1 };
+
+  const highestRisk = highestRiskData.asIsLikelihood * highestRiskData.asIsConsequence;
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -97,12 +104,11 @@ const TaskHazardDetailsModal = ({
         <View style={styles.riskIndicator}>
           <View style={styles.riskRow}>
             <Text style={styles.riskLabel}>Risk Level:</Text>
-            <View style={[
-              styles.riskBadge,
-              { backgroundColor: getRiskColor ? getRiskColor(highestRisk) : '#6b7280' }
-            ]}>
-              <Text style={styles.riskScore}>{highestRisk}</Text>
-            </View>
+          </View>
+          <View style={styles.riskDetailsRow}>
+            <Text style={styles.riskDetailsText}>
+              Likelihood: {highestRiskData.asIsLikelihood || 'Not specified'} | Consequence: {highestRiskData.asIsConsequence || 'Not specified'}
+            </Text>
           </View>
         </View>
       </View>
@@ -218,7 +224,7 @@ const TaskHazardDetailsModal = ({
         <View>
           <View style={styles.risksHeader}>
             <Text style={styles.risksTitle}>Identified Risks ({riskCount})</Text>
-            <Text style={styles.risksSubtitle}>Highest Risk Score: {highestRisk}</Text>
+            <Text style={styles.risksSubtitle}>Highest Risk: {getRiskScoreLabel(highestRisk)}</Text>
           </View>
           
           {taskHazard.risks.map((risk, index) => {
@@ -231,7 +237,10 @@ const TaskHazardDetailsModal = ({
                     styles.riskScoreBadge,
                     { backgroundColor: getRiskColor ? getRiskColor(riskScore) : '#6b7280' }
                   ]}>
-                    <Text style={styles.riskScoreText}>{riskScore}</Text>
+                    <Text style={styles.riskDetailsText}>
+                      {risk.asIsLikelihood || 'Not specified'} and {risk.asIsConsequence || 'Not specified'}
+                    </Text>
+                    <Text style={styles.riskScoreText}>Score {riskScore}</Text>
                   </View>
                 </View>
                 
@@ -454,6 +463,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  riskDetailsRow: {
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  riskDetailsText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
   sectionCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -552,16 +570,23 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   riskScoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 80,
     alignItems: 'center',
   },
   riskScoreText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  riskDetailsText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 2,
   },
   riskDescription: {
     fontSize: 14,

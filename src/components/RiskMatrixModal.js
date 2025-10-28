@@ -27,54 +27,54 @@ const RiskMatrixModal = ({
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
 
   const likelihoodLabels = [
-    { value: "Very Unlikely", label: "Very Unlikely", description: "Once in Lifetime >75 Years", score: 1 },
-    { value: "Slight Chance", label: "Slight Chance", description: "Once in 10 to 75 Years", score: 2 },
-    { value: "Feasible", label: "Feasible", description: "Once in 10 Years", score: 3 },
-    { value: "Likely", label: "Likely", description: "Once in 2 to 10 Years", score: 4 },
-    { value: "Very Likely", label: "Very Likely", description: "Multiple times in 2 Years", score: 5 },
+    { value: "Very Unlikely", label: "Very Unlikely", description: "Once in lifetime (>75 years)", score: 1 },
+    { value: "Slight Chance", label: "Slight Chance", description: "Once in 10-75 years", score: 2 },
+    { value: "Feasible", label: "Feasible", description: "Once in 10 years", score: 3 },
+    { value: "Likely", label: "Likely", description: "Once in 2-10 years", score: 4 },
+    { value: "Very Likely", label: "Very Likely", description: "Multiple times in 2 years", score: 5 },
   ];
 
   const getConsequenceLabels = (riskType) => {
     switch (riskType) {
       case "Personnel":
         return [
-          { value: "Minor", label: "Minor", description: "No Lost Time", score: 1 },
-          { value: "Significant", label: "Significant", description: "Lost Time", score: 2 },
-          { value: "Serious", label: "Serious", description: "Short Term Disability", score: 3 },
-          { value: "Major", label: "Major", description: "Long Term Disability", score: 4 },
+          { value: "Minor", label: "Minor", description: "No lost time", score: 1 },
+          { value: "Significant", label: "Significant", description: "Lost time", score: 2 },
+          { value: "Serious", label: "Serious", description: "Short-term disability", score: 3 },
+          { value: "Major", label: "Major", description: "Long-term disability", score: 4 },
           { value: "Catastrophic", label: "Catastrophic", description: "Fatality", score: 5 },
         ];
       case "Maintenance":
         return [
-          { value: "Minor", label: "Minor", description: "<5% Impact to Maintenance Budget", score: 1 },
-          { value: "Significant", label: "Significant", description: "5-10% Impact to Maintenance Budget", score: 2 },
-          { value: "Serious", label: "Serious", description: "20-30% Impact to Maintenance Budget", score: 3 },
-          { value: "Major", label: "Major", description: "30-40% Impact to Maintenance Budget", score: 4 },
-          { value: "Catastrophic", label: "Catastrophic", description: ">41% Impact to Maintenance Budget", score: 5 },
+          { value: "Minor", label: "Minor", description: "<5% impact to maintenance budget", score: 1 },
+          { value: "Significant", label: "Significant", description: "5-10% impact to maintenance budget", score: 2 },
+          { value: "Serious", label: "Serious", description: "20-30% impact to maintenance budget", score: 3 },
+          { value: "Major", label: "Major", description: "30-40% impact to maintenance budget", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: ">41% impact to maintenance budget", score: 5 },
         ];
       case "Revenue":
         return [
-          { value: "Minor", label: "Minor", description: "<2% Impact to Revenue", score: 1 },
-          { value: "Significant", label: "Significant", description: "2-6% Impact to Revenue", score: 2 },
-          { value: "Serious", label: "Serious", description: "6-12% Impact to Revenue", score: 3 },
-          { value: "Major", label: "Major", description: "12-24% Impact to Revenue", score: 4 },
-          { value: "Catastrophic", label: "Catastrophic", description: ">25% Impact to Revenue", score: 5 },
+          { value: "Minor", label: "Minor", description: "<2% impact to revenue", score: 1 },
+          { value: "Significant", label: "Significant", description: "2-6% impact to revenue", score: 2 },
+          { value: "Serious", label: "Serious", description: "6-12% impact to revenue", score: 3 },
+          { value: "Major", label: "Major", description: "12-24% impact to revenue", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: ">25% impact to revenue", score: 5 },
         ];
       case "Process":
         return [
-          { value: "Minor", label: "Minor", description: "Production Loss < 10 Days", score: 1 },
-          { value: "Significant", label: "Significant", description: "Production Loss 10 - 20 Days", score: 2 },
-          { value: "Serious", label: "Serious", description: "Production Loss 20 - 40 Days", score: 3 },
-          { value: "Major", label: "Major", description: "Production Loss 40 - 80 Days", score: 4 },
-          { value: "Catastrophic", label: "Catastrophic", description: "Production Loss >81 Days", score: 5 },
+          { value: "Minor", label: "Minor", description: "Production loss <10 days", score: 1 },
+          { value: "Significant", label: "Significant", description: "Production loss 10-20 days", score: 2 },
+          { value: "Serious", label: "Serious", description: "Production loss 20-40 days", score: 3 },
+          { value: "Major", label: "Major", description: "Production loss 40-80 days", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: "Production loss >81 days", score: 5 },
         ];
       case "Environmental":
         return [
-          { value: "Minor", label: "Minor", description: "Near Source - Non Reportable - Cleanup <1Shift", score: 1 },
-          { value: "Significant", label: "Significant", description: "Near Source - Reportable - Cleanup <1Shift", score: 2 },
-          { value: "Serious", label: "Serious", description: "Near Source - Reportable - Cleanup <4WKS", score: 3 },
-          { value: "Major", label: "Major", description: "Near Source - Reportable - Cleanup <52WKS", score: 4 },
-          { value: "Catastrophic", label: "Catastrophic", description: "Near Source - Reportable - Cleanup <1WK", score: 5 },
+          { value: "Minor", label: "Minor", description: "Near source - non-reportable - cleanup <1 shift", score: 1 },
+          { value: "Significant", label: "Significant", description: "Near source - reportable - cleanup <1 shift", score: 2 },
+          { value: "Serious", label: "Serious", description: "Near source - reportable - cleanup <4 weeks", score: 3 },
+          { value: "Major", label: "Major", description: "Near source - reportable - cleanup <52 weeks", score: 4 },
+          { value: "Catastrophic", label: "Catastrophic", description: "Near source - reportable - cleanup <1 week", score: 5 },
         ];
       default:
         return getConsequenceLabels("Personnel");
@@ -196,17 +196,6 @@ const RiskMatrixModal = ({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Supervisor Signature Warning for Post-Mitigation */}
-          {isPostMitigation && requiresSupervisorSignature && (
-            <View style={styles.supervisorWarning}>
-              <View style={styles.supervisorWarningContent}>
-                <Ionicons name="warning" size={20} color="#f59e0b" />
-                <Text style={styles.supervisorWarningText}>
-                  Supervisor Signature Required for High Risk ({'>'}9)
-                </Text>
-              </View>
-            </View>
-          )}
 
           {/* Risk Type Badge */}
           <View style={styles.riskTypeBadge}>
@@ -272,7 +261,11 @@ const RiskMatrixModal = ({
           {selectedCell && (
             <View style={styles.selectionSummary}>
               <Text style={styles.selectionTitle}>Selected Risk Assessment:</Text>
-              <Text style={styles.selectionText}>
+              <Text 
+                style={styles.selectionText}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
                 {selectedCell.likelihood.label} and {selectedCell.consequence.label}
               </Text>
               <View style={styles.selectionScore}>
@@ -381,13 +374,18 @@ const styles = StyleSheet.create({
   },
   matrixHeader: {
     flexDirection: 'row',
-    marginBottom: 2,
+    marginBottom: 0,
   },
   probabilityHeader: {
-    width: 120,
+    flex: 1,
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
+    padding: 4,
+    minHeight: 60,
+    minWidth: 60,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   headerText: {
     fontSize: 12,
@@ -401,10 +399,14 @@ const styles = StyleSheet.create({
   },
   consequenceHeader: {
     flex: 1,
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
+    padding: 4,
     minHeight: 60,
+    minWidth: 60,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   consequenceHeaderText: {
     fontSize: 11,
@@ -426,14 +428,19 @@ const styles = StyleSheet.create({
   },
   matrixRow: {
     flexDirection: 'row',
-    marginBottom: 2,
+    marginBottom: 0,
   },
   likelihoodHeader: {
-    width: 120,
+    flex: 1,
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
+    padding: 4,
     backgroundColor: '#f8fafc',
+    minHeight: 60,
+    minWidth: 60,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   likelihoodHeaderText: {
     fontSize: 11,
@@ -458,15 +465,19 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 1,
-    borderRadius: 4,
+    margin: 0,
+    borderRadius: 0,
+    minHeight: 60,
+    minWidth: 60,
+    borderWidth: 0,
   },
   selectedCell: {
     borderWidth: 3,
     borderColor: '#1d4ed8',
+    margin: 0,
   },
   matrixCellText: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
   },
@@ -513,6 +524,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0369a1',
     marginBottom: 8,
+    lineHeight: 18,
   },
   selectionScore: {
     flexDirection: 'row',

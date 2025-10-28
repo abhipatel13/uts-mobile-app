@@ -97,7 +97,7 @@ export async function apiClient(endpoint, options = {}) {
         
         // Trigger global logout to update app state
         try {
-          const { triggerGlobalLogout } = require('../../App');
+          const { triggerGlobalLogout } = require('../utils/globalHandlers');
           triggerGlobalLogout();
         } catch (importError) {
           console.warn('Could not trigger global logout:', importError);

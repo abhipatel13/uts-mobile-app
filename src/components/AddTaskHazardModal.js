@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import TaskRisksComponent from './TaskRisksComponent';
-import SimpleMapView from './SimpleMapView';
+import TaskHazardMapView from './TaskHazardMapView';
 import AssetSelector from './AssetSelector';
 import GeoFenceSettings from './GeoFenceSettings';
 import LocationSelector from './LocationSelector';
@@ -145,7 +145,20 @@ const AddTaskHazardModal = ({
     return '#22c55e'; // Low - Green
   };
 
-  // Create location data based on form location
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Active':
+        return '#22c55e'; // Green
+      case 'Pending':
+        return '#f59e0b'; // Orange
+      case 'Inactive':
+        return '#6b7280'; // Gray
+      default:
+        return '#6b7280'; // Gray
+    }
+  };
+
+  // Create task hazard data for map display
   const getLocationData = () => {
     if (!formData.location) return [];
     
@@ -170,14 +183,32 @@ const AddTaskHazardModal = ({
         }, 0) / formData.risks.length
       : 1;
 
-    return [{
+    // Create a complete task hazard object for map display
+    const taskHazard = {
+      id: 'preview-' + Date.now(), // Temporary ID for preview
+      date: formData.date,
+      time: formData.time,
+      scopeOfWork: formData.scopeOfWork,
+      assetSystem: formData.assetSystem,
+      systemLockoutRequired: formData.systemLockoutRequired,
+      trainedWorkforce: formData.trainedWorkforce,
+      individual: formData.individual,
+      supervisor: formData.supervisor,
+      location: formData.location,
+      status: formData.status,
+      geoFenceLimit: parseInt(formData.geoFenceLimit) || 200,
+      risks: formData.risks,
+      requiresApproval: formData.requiresApproval || false,
+      approvalStatus: formData.approvalStatus || 'not_required',
+      // Map-specific properties
       latitude: coords.latitude,
       longitude: coords.longitude,
       name: formData.location,
       count: formData.risks.length,
       riskScore: Math.round(avgRiskScore),
-      status: formData.status
-    }];
+    };
+
+    return [taskHazard];
   };
 
   const validateStep = (step) => {
@@ -657,12 +688,11 @@ const AddTaskHazardModal = ({
         <Text style={styles.helpText}>
           Visual overview of the task hazard location and risk assessment
         </Text>
-        <SimpleMapView
-          locationData={getLocationData()}
-          mapType={mapType}
-          onMapTypeChange={handleMapTypeChange}
+        <TaskHazardMapView
+          taskHazards={getLocationData()}
           onMarkerPress={handleMarkerPress}
           getRiskColor={getRiskColor}
+          getStatusColor={getStatusColor}
           isLoading={isMapLoading}
         />
       </View>

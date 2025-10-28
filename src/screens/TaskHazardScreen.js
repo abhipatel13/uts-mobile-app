@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Platform,
+  ActionSheetIOS,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardService } from '../services/TaskHazardService';
@@ -30,6 +32,7 @@ const TaskHazardScreen = () => {
   const [isUpdatingTaskHazard, setIsUpdatingTaskHazard] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   const [dataSource, setDataSource] = useState('api'); // 'api' or 'cache'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'active', 'completed', 'draft'
 
   // Load task hazards on component mount
   useEffect(() => {
@@ -194,11 +197,64 @@ const TaskHazardScreen = () => {
     switch (status) {
       case 'Active': return '#22c55e';
       case 'Pending': return '#f59e0b';
-      case 'Rejected': return '#ef4444';
-      case 'Completed': return '#3b82f6';
       case 'Inactive': return '#6b7280';
       default: return '#6b7280';
     }
+  };
+
+  // Filter task hazards based on status
+  const getFilteredTaskHazards = () => {
+    if (statusFilter === 'all') {
+      return taskHazards;
+    }
+    return taskHazards.filter(taskHazard => 
+      taskHazard.status?.toLowerCase() === statusFilter.toLowerCase()
+    );
+  };
+
+  const filteredTaskHazards = getFilteredTaskHazards();
+
+  // Filter options
+  const filterOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ];
+
+  const showFilterPicker = () => {
+    if (Platform.OS === 'ios') {
+      const options = ['Cancel', ...filterOptions.map(option => option.label)];
+      const cancelButtonIndex = 0;
+      
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          title: 'Filter by Status',
+        },
+        (buttonIndex) => {
+          if (buttonIndex !== cancelButtonIndex) {
+            const selectedOption = filterOptions[buttonIndex - 1];
+            setStatusFilter(selectedOption.value);
+          }
+        }
+      );
+    } else {
+      // Android - use Alert with buttons
+      const buttons = filterOptions.map(option => ({
+        text: option.label,
+        onPress: () => setStatusFilter(option.value),
+      }));
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      
+      Alert.alert('Filter by Status', '', buttons);
+    }
+  };
+
+  const getFilterLabel = () => {
+    const option = filterOptions.find(opt => opt.value === statusFilter);
+    return option ? option.label : 'All';
   };
 
   const renderTaskHazardItem = ({ item }) => {
@@ -341,49 +397,56 @@ const TaskHazardScreen = () => {
         </View>
       )}
 
-      {/* Header with View Toggle and Add Button */}
+      {/* Header with View Toggle, Filter, and Add Button */}
       <View style={styles.header}>
-        <View style={styles.headerActions}>
-          {/* View Toggle */}
-          <View style={styles.viewToggle}>
-            <TouchableOpacity 
-              style={[styles.toggleButton, viewMode === 'list' && styles.activeToggleButton]}
-              onPress={() => setViewMode('list')}
-            >
-              <Ionicons 
-                name="list-outline" 
-                size={18} 
-                color={viewMode === 'list' ? '#fff' : '#64748b'} 
-              />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.toggleButton, viewMode === 'map' && styles.activeToggleButton]}
-              onPress={() => setViewMode('map')}
-            >
-              <Ionicons 
-                name="map-outline" 
-                size={18} 
-                color={viewMode === 'map' ? '#fff' : '#64748b'} 
-              />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Add Button */}
+        {/* View Toggle - Left side */}
+        <View style={styles.viewToggle}>
           <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => setShowAddModal(true)}
+            style={[styles.toggleButton, viewMode === 'list' && styles.activeToggleButton]}
+            onPress={() => setViewMode('list')}
           >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.addButtonText}>Add</Text>
+            <Ionicons 
+              name="list-outline" 
+              size={18} 
+              color={viewMode === 'list' ? '#fff' : '#64748b'} 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.toggleButton, viewMode === 'map' && styles.activeToggleButton]}
+            onPress={() => setViewMode('map')}
+          >
+            <Ionicons 
+              name="map-outline" 
+              size={18} 
+              color={viewMode === 'map' ? '#fff' : '#64748b'} 
+            />
           </TouchableOpacity>
         </View>
+        
+        {/* Filter Button */}
+        <TouchableOpacity 
+          style={styles.filterButton}
+          onPress={showFilterPicker}
+        >
+          <Ionicons name="filter-outline" size={18} color="#64748b" />
+          <Text style={styles.filterButtonText}>{getFilterLabel()}</Text>
+        </TouchableOpacity>
+        
+        {/* Add Button - Right side */}
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => setShowAddModal(true)}
+        >
+          <Ionicons name="add" size={20} color="#fff" />
+          <Text style={styles.addButtonText}>Add Task Hazard</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content Area - List or Map View */}
       {taskHazards.length > 0 ? (
         viewMode === 'list' ? (
           <FlatList
-            data={taskHazards}
+            data={filteredTaskHazards}
             renderItem={renderTaskHazardItem}
             keyExtractor={(item) => item.id.toString()}
             style={styles.taskHazardsList}
@@ -410,7 +473,7 @@ const TaskHazardScreen = () => {
             }
           >
             <TaskHazardMapView
-              taskHazards={taskHazards}
+              taskHazards={filteredTaskHazards}
               onMarkerPress={handleTaskHazardInfo}
               getRiskColor={getRiskColor}
               getStatusColor={getStatusColor}
@@ -525,6 +588,22 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 4,
+  },
+  filterButtonText: {
+    color: '#64748b',
+    fontSize: 12,
     fontWeight: '500',
   },
   taskHazardsList: {

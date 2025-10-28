@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Platform,
+  ActionSheetIOS,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RiskAssessmentService } from '../services';
@@ -28,6 +30,7 @@ const RiskAssessmentScreen = () => {
   const [selectedRiskAssessment, setSelectedRiskAssessment] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [dataSource, setDataSource] = useState('api');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'active', 'completed', 'draft'
   const [pendingCount, setPendingCount] = useState(0);
 
   // Load risk assessments on component mount
@@ -212,11 +215,64 @@ const RiskAssessmentScreen = () => {
     switch (status) {
       case 'Active': return '#22c55e';
       case 'Pending': return '#f59e0b';
-      case 'Rejected': return '#ef4444';
-      case 'Completed': return '#3b82f6';
       case 'Inactive': return '#6b7280';
       default: return '#6b7280';
     }
+  };
+
+  // Filter risk assessments based on status
+  const getFilteredRiskAssessments = () => {
+    if (statusFilter === 'all') {
+      return riskAssessments;
+    }
+    return riskAssessments.filter(assessment => 
+      assessment.status?.toLowerCase() === statusFilter.toLowerCase()
+    );
+  };
+
+  const filteredRiskAssessments = getFilteredRiskAssessments();
+
+  // Filter options
+  const filterOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+  ];
+
+  const showFilterPicker = () => {
+    if (Platform.OS === 'ios') {
+      const options = ['Cancel', ...filterOptions.map(option => option.label)];
+      const cancelButtonIndex = 0;
+      
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          title: 'Filter by Status',
+        },
+        (buttonIndex) => {
+          if (buttonIndex !== cancelButtonIndex) {
+            const selectedOption = filterOptions[buttonIndex - 1];
+            setStatusFilter(selectedOption.value);
+          }
+        }
+      );
+    } else {
+      // Android - use Alert with buttons
+      const buttons = filterOptions.map(option => ({
+        text: option.label,
+        onPress: () => setStatusFilter(option.value),
+      }));
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      
+      Alert.alert('Filter by Status', '', buttons);
+    }
+  };
+
+  const getFilterLabel = () => {
+    const option = filterOptions.find(opt => opt.value === statusFilter);
+    return option ? option.label : 'All';
   };
 
   const renderRiskAssessmentItem = ({ item }) => {
@@ -346,10 +402,6 @@ const RiskAssessmentScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Risk Assessment Dashboard</Text>
-        </View>
         {renderLoadingState()}
       </View>
     );
@@ -371,13 +423,10 @@ const RiskAssessmentScreen = () => {
             <Ionicons name="cloud-offline-outline" size={16} color="#f59e0b" />
             <Text style={styles.offlineText}>Offline Mode - Showing cached data</Text>
           </View>
-        ) : (
-          // Keep height reserved when no banner is shown
-          <View style={styles.bannerSpacer} />
-        )}
+        ) : null}
       </View>
 
-      {/* Header with View Toggle and Add Button */}
+      {/* Header with Actions */}
       <View style={styles.header}>
         <View style={styles.headerActions}>
           {/* View Toggle */}
@@ -403,6 +452,15 @@ const RiskAssessmentScreen = () => {
               />
             </TouchableOpacity>
           </View>
+          
+          {/* Filter Button */}
+          <TouchableOpacity 
+            style={styles.filterButton}
+            onPress={showFilterPicker}
+          >
+            <Ionicons name="filter-outline" size={18} color="#64748b" />
+            <Text style={styles.filterButtonText}>{getFilterLabel()}</Text>
+          </TouchableOpacity>
                     
           <TouchableOpacity 
             style={styles.addButton}
@@ -417,7 +475,7 @@ const RiskAssessmentScreen = () => {
       {/* Risk Assessments List */}
       {riskAssessments.length > 0 ? (
         <FlatList
-          data={riskAssessments}
+          data={filteredRiskAssessments}
           renderItem={renderRiskAssessmentItem}
           keyExtractor={(item) => item.id.toString()}
           style={styles.riskAssessmentsList}
@@ -474,12 +532,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 8,
   },
   headerActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   viewToggle: {
     flexDirection: 'row',
@@ -499,8 +557,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1e293b',
-    flex: 1,
-    textAlign: 'center',
   },
   addButton: {
     flexDirection: 'row',
@@ -514,6 +570,22 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '500',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 4,
+  },
+  filterButtonText: {
+    color: '#64748b',
+    fontSize: 12,
     fontWeight: '500',
   },
   riskAssessmentsList: {
@@ -665,7 +737,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fef3c7',
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#fbbf24',
@@ -678,7 +750,7 @@ const styles = StyleSheet.create({
   },
   // Reserve space so banners don't shift layout
   bannerContainer: {
-    height: 40,
+    height: 10,
     justifyContent: 'center',
   },
   bannerSpacer: {
@@ -689,7 +761,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#eff6ff',
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#3b82f6',

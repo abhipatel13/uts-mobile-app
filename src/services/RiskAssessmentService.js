@@ -1,6 +1,7 @@
 import { RiskAssessmentApi } from './RiskAssessmentApi';
 import DatabaseService from './DatabaseService';
 import NetInfo from '@react-native-community/netinfo';
+import { AuthService } from './AuthService';
 
 class RiskAssessmentService {
   /**
@@ -79,6 +80,15 @@ class RiskAssessmentService {
    */
   static async getAll(params = {}) {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        console.warn('RiskAssessmentService: User not authenticated, skipping API calls');
+        // Return cached data only
+        const cachedData = await this.getRiskAssessmentsFromCache();
+        return { data: cachedData, source: 'cache', offline: true };
+      }
+
       // Ensure database is ready before proceeding
       if (!DatabaseService.isDatabaseReady()) {
         await DatabaseService.waitForDatabaseReady();
@@ -102,6 +112,13 @@ class RiskAssessmentService {
           }
         } catch (apiError) {
           console.error('RiskAssessmentService: API call failed:', apiError);
+          
+          // Check if it's an authentication error - if so, re-throw it to trigger logout
+          if (apiError.code === 'AUTH_EXPIRED' || apiError.status === 401) {
+            console.warn('Authentication expired - user will be logged out');
+            throw apiError;
+          }
+          // For other errors, fall through to cache
         }
       }
       
@@ -147,6 +164,12 @@ class RiskAssessmentService {
    */
   static async create(data) {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {
@@ -224,6 +247,12 @@ class RiskAssessmentService {
    */
   static async update(id, data) {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {
@@ -298,6 +327,12 @@ class RiskAssessmentService {
    */
   static async delete(id) {
     try {
+      // Check authentication first
+      const isAuthenticated = await AuthService.isAuthenticated();
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated. Please login again.');
+      }
+
       const isOnline = await NetInfo.fetch().then(state => state.isConnected);
       
       if (isOnline) {
