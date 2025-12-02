@@ -110,9 +110,7 @@ class RiskAssessmentService {
               return { ...response, source: 'api' };
             }
           }
-        } catch (apiError) {
-          console.error('RiskAssessmentService: API call failed:', apiError);
-          
+        } catch (apiError) {          
           // Check if it's an authentication error - if so, re-throw it to trigger logout
           if (apiError.code === 'AUTH_EXPIRED' || apiError.status === 401) {
             console.warn('Authentication expired - user will be logged out');
@@ -126,8 +124,6 @@ class RiskAssessmentService {
       const cachedData = await this.getRiskAssessmentsFromCache();
       return { data: cachedData, source: 'cache' };
     } catch (error) {
-      console.error('Error in RiskAssessmentService.getAll:', error);
-      
       // Fallback to cache on error
       try {
         const cachedData = await this.getRiskAssessmentsFromCache();
