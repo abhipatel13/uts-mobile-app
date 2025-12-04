@@ -62,7 +62,7 @@ function HeaderGPSButton({ locationStatus, onPress }) {
 }
 
 // Sidebar Modal Component
-function SidebarModal({ visible, onClose, navigation, currentRoute }) {
+function SidebarModal({ visible, onClose, navigation, currentRoute, currentUserRole }) {
   const slideAnim = useState(new Animated.Value(-280))[0];
   const fadeAnim = useState(new Animated.Value(0))[0];
 
@@ -121,6 +121,7 @@ function SidebarModal({ visible, onClose, navigation, currentRoute }) {
               routeNames: [currentRoute], 
               index: 0 
             }}
+            currentUserRole={currentUserRole}
           />
         </Animated.View>
         <Animated.View style={[styles.modalBackground, { opacity: fadeAnim }]}>
@@ -135,7 +136,7 @@ function SidebarModal({ visible, onClose, navigation, currentRoute }) {
 }
 
 // Main App Navigator with Custom Sidebar
-function MainAppNavigator() {
+function MainAppNavigator({ currentUserRole }) {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [currentRoute, setCurrentRoute] = useState('Dashboard');
   const [locationStatus, setLocationStatus] = useState(null);
@@ -247,6 +248,7 @@ function MainAppNavigator() {
       onClose={() => setSidebarVisible(false)}
       navigation={navigationRef.current}
       currentRoute={currentRoute}
+      currentUserRole={currentUserRole}
     />
   </View>
   );
@@ -257,6 +259,7 @@ function MainAppNavigator() {
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState(null);
 
   useEffect(() => {
     initializeApp();
@@ -345,11 +348,30 @@ export default function App() {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Direct check of AsyncStorage
-      const user = await AsyncStorage.getItem('user');
+     const userString = await AsyncStorage.getItem('user');
       const token = await AsyncStorage.getItem('authToken');
-      const authenticated = !!(user && token);
+      const authenticated = !!(userString && token);
       
       setIsAuthenticated(authenticated);
+
+      // Extract and set user role if authenticated
+      if (authenticated && userString) {
+        try {
+          const user = JSON.parse(userString);
+          const userRole = user.role || null;
+          setCurrentUserRole(userRole);
+          
+          // You can add role-based logic here
+          // For example, restrict certain features based on role
+          if (userRole) {
+            handleRoleBasedInitialization(userRole);
+          }
+        } catch (parseError) {
+          console.error('Error parsing user data:', parseError);
+        }
+      } else {
+        setCurrentUserRole(null);
+      }
 
       // If authenticated, pre-cache essential data for offline use
       if (authenticated) {
@@ -358,8 +380,34 @@ export default function App() {
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
+      setCurrentUserRole(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle role-based initialization logic
+  const handleRoleBasedInitialization = (role) => {
+    // Add any role-specific initialization logic here
+    switch (role) {
+      case 'superuser':
+        console.log('Superuser detected - Full access enabled');
+        // Add superuser-specific initialization
+        break;
+      case 'admin':
+        console.log('Admin detected - Administrative access enabled');
+        // Add admin-specific initialization
+        break;
+      case 'supervisor':
+        console.log('Supervisor detected - Approval access enabled');
+        // Add supervisor-specific initialization
+        break;
+      case 'user':
+        console.log('Standard user detected - Basic access enabled');
+        // Add user-specific initialization
+        break;
+      default:
+        console.log('Unknown role:', role);
     }
   };
 
@@ -377,7 +425,9 @@ export default function App() {
         <StatusBar style="light" backgroundColor="rgb(52, 73, 94)" />
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {isAuthenticated ? (
-            <Stack.Screen name="MainApp" component={MainAppNavigator} />
+            <Stack.Screen name="MainApp">
+              {(props) => <MainAppNavigator {...props} currentUserRole={currentUserRole} />}
+            </Stack.Screen>
           ) : (
             <Stack.Screen name="Login" component={LoginScreen} />
           )}

@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/AuthService';
 import { triggerGlobalLogout } from '../utils/globalHandlers';
 
-const menuItems = [
+const allMenuItems = [
   {
     name: 'Dashboard',
     icon: 'home-outline',
@@ -54,7 +54,7 @@ const menuItems = [
 ];
 
 export default function CustomDrawerContent(props) {
-  const { navigation, state } = props;
+  const { navigation, state, currentUserRole } = props;
   const currentRoute = state.routeNames[state.index];
   const [expandedMenus, setExpandedMenus] = useState(new Set());
   const [currentUser, setCurrentUser] = useState(null);
@@ -71,6 +71,73 @@ export default function CustomDrawerContent(props) {
       console.error('CustomDrawerContent: loadCurrentUser failed:', error.message);
     }
   };
+
+  // Filter menu items based on user role
+  const getFilteredMenuItems = () => {
+    const userRole = currentUserRole || currentUser?.role;
+    
+    // If user role is 'user', show limited menu
+    if (userRole === 'user') {
+      return allMenuItems
+        .filter(item => {
+          // Remove Dashboard
+          if (item.name === 'Dashboard') return false;
+          // Remove Analytics
+          if (item.name === 'Analytics') return false;
+          // Keep Asset Hierarchy and Safety
+          return item.name === 'Asset Hierarchy' || item.name === 'Safety';
+        })
+        .map(item => {
+          // Filter Safety subItems to only show Task Hazard
+          if (item.name === 'Safety' && item.hasSubItems) {
+            return {
+              ...item,
+              subItems: item.subItems.filter(subItem => subItem.name === 'Task Hazard')
+            };
+          }
+          return item;
+        });
+    }
+    
+    // If user role is 'supervisor', show specific menu items
+    if (userRole === 'supervisor') {
+      return allMenuItems
+        .filter(item => {
+          // Remove Dashboard
+          if (item.name === 'Dashboard') return false;
+          // Keep Asset Hierarchy, Safety, and Analytics
+          return item.name === 'Asset Hierarchy' || item.name === 'Safety' || item.name === 'Analytics';
+        })
+        .map(item => {
+          // Filter Safety subItems - show all (Task Hazard, Risk Assessment, Approval Requests)
+          if (item.name === 'Safety' && item.hasSubItems) {
+            // Keep all Safety subItems for supervisor
+            return item;
+          }
+          // Filter Analytics subItems - show Task Hazard and Risk Assessment (remove Approval Requests if it exists)
+          if (item.name === 'Analytics' && item.hasSubItems) {
+            return {
+              ...item,
+              subItems: item.subItems.filter(subItem => 
+                subItem.name === 'Task Hazard' || subItem.name === 'Risk Assessment'
+              )
+            };
+          }
+          return item;
+        });
+    }
+    
+    // For admin and superuser roles - show ALL menu items with full access
+    // This includes: Dashboard, Asset Hierarchy, Safety (all sub-items), Analytics (all sub-items)
+    if (userRole === 'admin' || userRole === 'superuser') {
+      return allMenuItems;
+    }
+    
+    // Default fallback - show all menu items (for any other roles)
+    return allMenuItems;
+  };
+
+  const menuItems = getFilteredMenuItems();
 
   const toggleMenu = (index) => {
     const newExpanded = new Set(expandedMenus);

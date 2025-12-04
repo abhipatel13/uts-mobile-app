@@ -103,7 +103,30 @@ const AddRiskAssessmentModal = ({
     setCurrentStep(1);
   };
 
+  // Format time input to HH:MM format
+  const formatTimeInput = useCallback((value) => {
+    // Remove all non-numeric characters
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limit to 4 digits (HHMM)
+    const limited = numbers.slice(0, 4);
+    
+    // Format as HH:MM
+    if (limited.length === 0) {
+      return '';
+    } else if (limited.length <= 2) {
+      return limited;
+    } else {
+      return `${limited.slice(0, 2)}:${limited.slice(2, 4)}`;
+    }
+  }, []);
+
   const handleInputChange = useCallback((field, value) => {
+    // Format time input automatically
+    if (field === 'time') {
+      value = formatTimeInput(value);
+    }
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -119,7 +142,7 @@ const AddRiskAssessmentModal = ({
       }
       return prev;
     });
-  }, []);
+  }, [formatTimeInput]);
 
   const validateStep = (step) => {
     const newErrors = {};
@@ -274,6 +297,8 @@ const AddRiskAssessmentModal = ({
             value={formData.time}
             onChangeText={(value) => handleInputChange('time', value)}
             placeholder="HH:MM"
+            keyboardType="numeric"
+            maxLength={5}
           />
           {errors.time && <Text style={styles.errorText}>{errors.time}</Text>}
         </View>

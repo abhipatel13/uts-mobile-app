@@ -110,7 +110,30 @@ const AddTaskHazardModal = ({
     setCurrentStep(1);
   };
 
+  // Format time input to HH:MM format
+  const formatTimeInput = (value) => {
+    // Remove all non-numeric characters
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limit to 4 digits (HHMM)
+    const limited = numbers.slice(0, 4);
+    
+    // Format as HH:MM
+    if (limited.length === 0) {
+      return '';
+    } else if (limited.length <= 2) {
+      return limited;
+    } else {
+      return `${limited.slice(0, 2)}:${limited.slice(2, 4)}`;
+    }
+  };
+
   const handleInputChange = (field, value) => {
+    // Format time input automatically
+    if (field === 'time') {
+      value = formatTimeInput(value);
+    }
+    
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -387,9 +410,28 @@ const AddTaskHazardModal = ({
     }
 
     // Determine if signature is required based on risk level or other criteria
-    const requiresSignature = formData.risks.some(risk => 
-      risk.asIsLikelihood * risk.asIsConsequence >= 12 || // High risk
-      risk.asIsLikelihood * risk.asIsConsequence >= 9     // Medium-High risk
+    // Also set requiresSupervisorSignature on individual risks
+    const processedRisks = formData.risks.map(risk => {
+      const asIsScore = (risk.asIsLikelihood || 1) * (risk.asIsConsequence || 1);
+      const mitigatedScore = (risk.mitigatedLikelihood || 1) * (risk.mitigatedConsequence || 1);
+      
+      // Set requiresSupervisorSignature if:
+      // - As-is score >= 9 (Medium-High or High risk)
+      // - Mitigated score > 9 (High risk after mitigation)
+      // - Already set on the risk
+      const requiresSupervisorSignature = 
+        risk.requiresSupervisorSignature || 
+        asIsScore >= 9 || 
+        mitigatedScore > 9;
+      
+      return {
+        ...risk,
+        requiresSupervisorSignature
+      };
+    });
+
+    const requiresSignature = processedRisks.some(risk => 
+      risk.requiresSupervisorSignature
     ) || formData.systemLockoutRequired || formData.trainedWorkforce;
 
     const taskHazardToCreate = {
@@ -404,7 +446,7 @@ const AddTaskHazardModal = ({
       location: formData.location.trim(),
       status: requiresSignature && formData.supervisor ? 'Pending' : formData.status,
       geoFenceLimit: parseInt(formData.geoFenceLimit) || 200,
-      risks: formData.risks,
+      risks: processedRisks, // Use processed risks with requiresSupervisorSignature set
       requiresApproval: requiresSignature && !!formData.supervisor,
       approvalStatus: requiresSignature && formData.supervisor ? 'pending' : 'not_required'
     };
@@ -467,6 +509,8 @@ const AddTaskHazardModal = ({
             value={formData.time}
             onChangeText={(value) => handleInputChange('time', value)}
             placeholder="HH:MM"
+            keyboardType="numeric"
+            maxLength={5}
           />
           {errors.time && <Text style={styles.errorText}>{errors.time}</Text>}
         </View>

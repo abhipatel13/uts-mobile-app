@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AssetHierarchyService } from '../services/AssetHierarchyService';
@@ -125,13 +126,13 @@ const AssetHierarchyScreen = () => {
   const renderAssetItem = ({ item }) => {
     const isExpanded = expandedItems[item.id];
     const indentWidth = item.level * 20; // 20px per level
-    
 
     return (
       <View style={styles.assetItem}>
         <TouchableOpacity 
           style={[styles.assetRow, { paddingLeft: 20 + indentWidth }]}
           onPress={() => item.hasChildren && toggleExpand(item.id)}
+          activeOpacity={0.7}
         >
           <View style={styles.assetInfo}>
             <View style={styles.expandContainer}>
@@ -140,18 +141,19 @@ const AssetHierarchyScreen = () => {
                   name={isExpanded ? "chevron-down" : "chevron-forward"} 
                   size={16} 
                   color="#64748b" 
-
                 />
               ) : (
                 <View style={{ width: 16 }} />
               )}
-              <Text style={styles.assetId}>
+              <Text style={styles.assetId} numberOfLines={1}>
                 {item.cmmsInternalId || item.id}
               </Text>
             </View>
             <View style={styles.assetDetails}>
-              <Text style={styles.assetName}>{item.name}</Text>
-              <Text style={styles.assetType}>
+              <Text style={styles.assetName} numberOfLines={1}>
+                {item.name || ''}
+              </Text>
+              <Text style={styles.assetType} numberOfLines={1}>
                 {item.objectType || (item.parent ? 'Child Asset' : 'Root Asset')}
               </Text>
             </View>
@@ -219,34 +221,56 @@ const AssetHierarchyScreen = () => {
         </View>
       )}
 
-      {/* Table Header */}
-      {flattenedAssets.length > 0 && (
-        <View style={styles.tableHeader}>
-          <Text style={styles.columnHeader}>ID</Text>
-          <Text style={styles.columnHeader}>NAME</Text>
-        </View>
-      )}
+      {/* Horizontal Scrollable Content */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={true}
+        style={styles.pageScrollView}
+        contentContainerStyle={styles.pageScrollContent}
+        nestedScrollEnabled={true}
+        bounces={false}
+        scrollEventThrottle={16}
+      >
+        <View style={styles.contentWrapper}>
+          {/* Table Header */}
+          {flattenedAssets.length > 0 && (
+            <View style={styles.tableHeader}>
+              <View style={styles.headerContent}>
+                <View style={styles.headerIdSection}>
+                  <View style={styles.headerExpandSpacer} />
+                  <Text style={styles.columnHeader}>ID</Text>
+                </View>
+                <View style={styles.headerNameSection}>
+                  <Text style={styles.columnHeader}>NAME</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
-      {/* Asset List */}
-      {flattenedAssets.length > 0 ? (
-        <FlatList
-          data={flattenedAssets}
-          renderItem={renderAssetItem}
-          keyExtractor={(item) => item.id}
-          style={styles.assetList}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              colors={['rgb(52, 73, 94)']}
-              tintColor="rgb(52, 73, 94)"
+          {/* Asset List */}
+          {flattenedAssets.length > 0 ? (
+            <FlatList
+              data={flattenedAssets}
+              renderItem={renderAssetItem}
+              keyExtractor={(item) => item.id}
+              style={styles.assetList}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  colors={['rgb(52, 73, 94)']}
+                  tintColor="rgb(52, 73, 94)"
+                />
+              }
             />
-          }
-        />
-      ) : (
-        renderEmptyState()
-      )}
+          ) : (
+            renderEmptyState()
+          )}
+        </View>
+      </ScrollView>
 
       {/* Asset Details Modal */}
       <AssetDetailsModal
@@ -275,9 +299,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   offlineBannerText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#92400e',
     fontWeight: '500',
+    fontFamily: 'System',
   },
   header: {
     flexDirection: 'row',
@@ -288,21 +313,48 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
+  pageScrollView: {
+    flex: 1,
+  },
+  pageScrollContent: {
+    flexGrow: 1,
+  },
+  contentWrapper: {
+    minWidth: '100%',
+  },
   tableHeader: {
-    flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#cbd5e1',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+  headerIdSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+    flexShrink: 0,
+  },
+  headerExpandSpacer: {
+    width: 16,
+    marginRight: 8,
+  },
+  headerNameSection: {
+    flex: 1,
+    marginLeft: 20,
+    minWidth: 0,
   },
   columnHeader: {
-    flex: 1,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#0f172a',
+    fontFamily: 'System',
   },
   assetList: {
     flex: 1,
@@ -320,35 +372,45 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   assetInfo: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   expandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     marginRight: 20,
+    flexShrink: 0,
   },
   assetId: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1e293b',
     marginLeft: 8,
+    fontFamily: 'System',
+    flexShrink: 0,
   },
   assetDetails: {
-    flex: 1,
+    flexDirection: 'column',
     alignItems: 'flex-end',
+    flex: 1,
+    marginLeft: 20,
+    minWidth: 0,
   },
   assetName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#1e293b',
     marginBottom: 2,
+    fontFamily: 'System',
+    textAlign: 'right',
   },
   assetType: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
+    fontFamily: 'System',
   },
   infoButton: {
     padding: 4,
@@ -362,8 +424,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 14,
+    color: '#1e293b',
+    fontWeight: '500',
+    fontFamily: 'System',
   },
   emptyState: {
     flex: 1,
@@ -373,18 +437,21 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#1e293b',
     marginTop: 16,
     marginBottom: 8,
+    fontFamily: 'System',
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#1e293b',
+    fontWeight: '500',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
+    fontFamily: 'System',
   },
   retryButton: {
     backgroundColor: 'rgb(52, 73, 94)',
@@ -396,6 +463,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',
+    fontFamily: 'System',
   },
 });
 

@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   ActionSheetIOS,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AssetHierarchyService } from '../services/AssetHierarchyService';
@@ -186,6 +187,9 @@ const AssetSelector = ({
 
   // Render asset hierarchy recursively
   const renderAssetHierarchy = (assetList) => {
+    const screenWidth = Dimensions.get('window').width;
+    const contentWidth = screenWidth + 400;
+    
     return assetList.map(asset => {
       const children = getChildAssets(asset.id);
       const hasChildren = children.length > 0;
@@ -193,11 +197,11 @@ const AssetSelector = ({
       const isSelected = value === asset.id;
 
       return (
-        <View key={asset.id} style={styles.assetItem}>
+        <View key={asset.id} style={[styles.assetItem, { width: contentWidth }]}>
           <TouchableOpacity
             style={[
               styles.assetRow,
-              { paddingLeft: asset.level * 24 + 16 },
+              { paddingLeft: asset.level * 24 + 16, width: contentWidth },
               isSelected && styles.selectedAssetRow
             ]}
             onPress={() => handleAssetSelection(asset)}
@@ -220,15 +224,15 @@ const AssetSelector = ({
               
               <View style={styles.assetInfoContainer}>
                 <View style={styles.assetMainInfo}>
-                  <Text style={[styles.assetId, isSelected && styles.selectedText]}>
+                  <Text style={[styles.assetId, isSelected && styles.selectedText]} numberOfLines={1}>
                     {asset.id}
                   </Text>
-                  <Text style={[styles.assetName, isSelected && styles.selectedText]}>
+                  <Text style={[styles.assetName, isSelected && styles.selectedText]} numberOfLines={1}>
                     {asset.name || 'Unnamed Asset'}
                   </Text>
                 </View>
                 {asset.description && (
-                  <Text style={[styles.assetDescription, isSelected && styles.selectedText]}>
+                  <Text style={[styles.assetDescription, isSelected && styles.selectedText]} numberOfLines={1}>
                     {asset.description}
                   </Text>
                 )}
@@ -345,19 +349,29 @@ const AssetSelector = ({
             </View>
           ) : (
             <ScrollView 
-              style={styles.assetList} 
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.assetListContent}
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              style={styles.horizontalScrollView}
+              contentContainerStyle={styles.horizontalScrollContent}
+              nestedScrollEnabled={true}
+              bounces={false}
             >
-              {filteredAssets.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No assets found</Text>
-                </View>
-              ) : (
-                <View style={styles.hierarchyContainer}>
-                  {renderAssetHierarchy(getTopLevelAssets())}
-                </View>
-              )}
+              <ScrollView 
+                style={styles.assetList} 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.assetListContent}
+                nestedScrollEnabled={true}
+              >
+                {filteredAssets.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No assets found</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.hierarchyContainer, { minWidth: Dimensions.get('window').width + 400 }]}>
+                    {renderAssetHierarchy(getTopLevelAssets())}
+                  </View>
+                )}
+              </ScrollView>
             </ScrollView>
           )}
         </View>
@@ -373,8 +387,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: '#1e293b',
     marginBottom: 8,
+    fontFamily: 'System',
   },
   selector: {
     borderWidth: 1,
@@ -392,17 +407,21 @@ const styles = StyleSheet.create({
     borderColor: '#ef4444',
   },
   selectorText: {
-    fontSize: 16,
-    color: '#111827',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
     flex: 1,
+    fontFamily: 'System',
   },
   placeholderText: {
-    color: '#9ca3af',
+    color: '#64748b',
   },
   errorText: {
     color: '#ef4444',
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: '500',
     marginTop: 4,
+    fontFamily: 'System',
   },
   modalContainer: {
     flex: 1,
@@ -418,9 +437,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e2e8f0',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#1e293b',
+    fontFamily: 'System',
   },
   closeButton: {
     padding: 4,
@@ -441,8 +461,16 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '500',
     color: '#1e293b',
+    fontFamily: 'System',
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalScrollContent: {
+    flexGrow: 1,
   },
   assetList: {
     flex: 1,
@@ -460,8 +488,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
+    fontFamily: 'System',
   },
   emptyContainer: {
     flex: 1,
@@ -470,8 +500,10 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
+    fontFamily: 'System',
   },
   assetItem: {
     // No border - cleaner hierarchy look
@@ -480,6 +512,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingRight: 16,
     minHeight: 44, // Ensure touch target size
+    flexShrink: 0,
   },
   selectedAssetRow: {
     backgroundColor: '#e0f2fe',
@@ -487,6 +520,7 @@ const styles = StyleSheet.create({
   assetContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    flexShrink: 0,
   },
   expandButton: {
     padding: 8,
@@ -503,35 +537,36 @@ const styles = StyleSheet.create({
   assetInfoContainer: {
     flex: 1,
     paddingTop: 2,
+    flexShrink: 0,
+    minWidth: 0,
   },
   assetMainInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    flexShrink: 0,
   },
   assetId: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#1e293b',
-    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    fontFamily: 'System',
     marginRight: 8,
-    minWidth: 60,
+    flexShrink: 0,
   },
   assetName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
-    flex: 1,
+    color: '#1e293b',
+    flexShrink: 0,
+    fontFamily: 'System',
   },
   assetDescription: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
     marginTop: 4,
-    fontStyle: 'italic',
+    fontFamily: 'System',
+    flexShrink: 0,
   },
   selectedText: {
     color: '#0369a1',

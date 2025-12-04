@@ -387,6 +387,26 @@ const EditTaskHazardModal = ({
       return;
     }
 
+    // Process risks to ensure requiresSupervisorSignature is set correctly
+    const processedRisks = formData.risks.map(risk => {
+      const asIsScore = (risk.asIsLikelihood || 1) * (risk.asIsConsequence || 1);
+      const mitigatedScore = (risk.mitigatedLikelihood || 1) * (risk.mitigatedConsequence || 1);
+      
+      // Set requiresSupervisorSignature if:
+      // - As-is score >= 9 (Medium-High or High risk)
+      // - Mitigated score > 9 (High risk after mitigation)
+      // - Already set on the risk
+      const requiresSupervisorSignature = 
+        risk.requiresSupervisorSignature || 
+        asIsScore >= 9 || 
+        mitigatedScore > 9;
+      
+      return {
+        ...risk,
+        requiresSupervisorSignature
+      };
+    });
+
     const taskHazardToUpdate = {
       id: taskHazard.id,
       date: formData.date,
@@ -400,7 +420,7 @@ const EditTaskHazardModal = ({
       location: formData.location.trim(),
       status: formData.status,
       geoFenceLimit: parseInt(formData.geoFenceLimit) || 200,
-      risks: formData.risks
+      risks: processedRisks // Use processed risks with requiresSupervisorSignature set
     };
 
     try {
