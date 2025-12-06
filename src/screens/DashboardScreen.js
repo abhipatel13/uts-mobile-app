@@ -101,6 +101,7 @@ const DashboardScreen = ({ navigation }) => {
     const userRole = userInfo.role;
 
     // If user role is 'user', show only Asset Hierarchy and Task Hazard
+    // Matches sidebar: Asset Hierarchy, Safety > Task Hazard
     if (userRole === 'user') {
       return allDashboardCards.filter(card => 
         card.title === 'Asset Hierarchy' || card.title === 'Task Hazard'
@@ -108,11 +109,13 @@ const DashboardScreen = ({ navigation }) => {
     }
 
     // If user role is 'supervisor', show Asset Hierarchy, Task Hazard, Risk Assessment, and Analytics
+    // Matches sidebar: Asset Hierarchy, Safety (all sub-items), Analytics (Task Hazard, Risk Assessment)
     if (userRole === 'supervisor') {
-      return allDashboardCards; // Supervisor can see all
+      return allDashboardCards; // Supervisor can see all dashboard cards
     }
 
     // For admin and superuser roles - show ALL cards
+    // Matches sidebar: All menu items with full access
     if (userRole === 'admin' || userRole === 'superuser') {
       return allDashboardCards;
     }
