@@ -121,6 +121,31 @@ const AddRiskAssessmentModal = ({
     }
   }, []);
 
+  // Validate time format and values
+  const isValidTime = useCallback((timeString) => {
+    if (!timeString || timeString.trim() === '') {
+      return false;
+    }
+    
+    // Check format HH:MM
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
+    if (!timeRegex.test(timeString)) {
+      return false;
+    }
+    
+    const [hours, minutes] = timeString.split(':').map(Number);
+    
+    // Validate hours (0-23) and minutes (0-59)
+    if (hours < 0 || hours > 23) {
+      return false;
+    }
+    if (minutes < 0 || minutes > 59) {
+      return false;
+    }
+    
+    return true;
+  }, []);
+
   const handleInputChange = useCallback((field, value) => {
     // Format time input automatically
     if (field === 'time') {
@@ -154,6 +179,8 @@ const AddRiskAssessmentModal = ({
       }
       if (!formData.time) {
         newErrors.time = 'Time is required';
+      } else if (!isValidTime(formData.time)) {
+        newErrors.time = 'Please enter a valid time (HH:MM format, hours 0-23, minutes 0-59)';
       }
       if (!formData.scopeOfWork.trim()) {
         newErrors.scopeOfWork = 'Scope of Work is required';
@@ -296,6 +323,15 @@ const AddRiskAssessmentModal = ({
             style={[styles.input, errors.time && styles.inputError]}
             value={formData.time}
             onChangeText={(value) => handleInputChange('time', value)}
+            onBlur={() => {
+              // Validate time when field loses focus
+              if (formData.time && !isValidTime(formData.time)) {
+                setErrors(prev => ({
+                  ...prev,
+                  time: 'Please enter a valid time (HH:MM format, hours 0-23, minutes 0-59)'
+                }));
+              }
+            }}
             placeholder="HH:MM"
             keyboardType="numeric"
             maxLength={5}

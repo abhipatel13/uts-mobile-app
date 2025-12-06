@@ -18,6 +18,7 @@ const DashboardScreen = ({ navigation }) => {
   const [screenData, setScreenData] = useState(Dimensions.get('window'));
   const [userInfo, setUserInfo] = useState({
     name: '',
+    role: null,
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -44,9 +45,10 @@ const DashboardScreen = ({ navigation }) => {
 
       if (userData) {
         const parsedUser = JSON.parse(userData);
-        // Only extract the name field
+        // Extract name and role
         setUserInfo({
           name: typeof parsedUser.name === 'string' ? parsedUser.name : 'User',
+          role: parsedUser.role || null,
         });
       }
       
@@ -63,7 +65,7 @@ const DashboardScreen = ({ navigation }) => {
   const isTablet = width >= 768;
   const isSmallScreen = width < 360;
 
-  const dashboardCards = [
+  const allDashboardCards = [
     {
       title: 'Asset Hierarchy',
       description: 'Manage and view your asset hierarchy structure',
@@ -94,6 +96,32 @@ const DashboardScreen = ({ navigation }) => {
     },
   ];
 
+  // Filter dashboard cards based on user role
+  const getFilteredDashboardCards = () => {
+    const userRole = userInfo.role;
+
+    // If user role is 'user', show only Asset Hierarchy and Task Hazard
+    if (userRole === 'user') {
+      return allDashboardCards.filter(card => 
+        card.title === 'Asset Hierarchy' || card.title === 'Task Hazard'
+      );
+    }
+
+    // If user role is 'supervisor', show Asset Hierarchy, Task Hazard, Risk Assessment, and Analytics
+    if (userRole === 'supervisor') {
+      return allDashboardCards; // Supervisor can see all
+    }
+
+    // For admin and superuser roles - show ALL cards
+    if (userRole === 'admin' || userRole === 'superuser') {
+      return allDashboardCards;
+    }
+
+    // Default fallback - show all cards (for any other roles or if role is not set)
+    return allDashboardCards;
+  };
+
+  const dashboardCards = getFilteredDashboardCards();
 
   const dynamicStyles = createDynamicStyles(width, isTablet, isSmallScreen);
 

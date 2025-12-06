@@ -35,7 +35,7 @@ const RiskAssessmentAnalyticsScreen = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [dataSource, setDataSource] = useState('api');
 
-  const statusOptions = ['All', 'Active', 'Inactive', 'Pending', 'Completed'];
+  const statusOptions = ['All', 'Active', 'Inactive', 'Pending', 'Completed', 'Rejected'];
 
   // Load data on component mount
   useEffect(() => {
@@ -233,7 +233,9 @@ const RiskAssessmentAnalyticsScreen = () => {
       {/* Map Section */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <RiskAssessmentMapView
-          riskAssessments={riskAssessments}
+          riskAssessments={selectedStatus === 'All' 
+            ? riskAssessments 
+            : riskAssessments.filter(ra => ra.status === selectedStatus)}
           onMarkerPress={showRiskAssessmentDetails}
           getRiskColor={getRiskColor}
           getStatusColor={getStatusColor}
@@ -263,76 +265,6 @@ const RiskAssessmentAnalyticsScreen = () => {
             <Text style={styles.cardTitle}>Locations</Text>
             <Text style={[styles.cardValue, { color: '#3b82f6' }]}>{analytics.locations}</Text>
             <Text style={styles.cardSubtext}>Different sites</Text>
-          </View>
-        </View>
-
-        {/* Risk Distribution Chart */}
-        <View style={styles.chartContainer}>
-          <Text style={styles.chartTitle}>Risk Distribution</Text>
-          <View style={styles.riskDistribution}>
-            <View style={styles.riskBar}>
-              <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>Low</Text>
-                <Text style={styles.riskBarValue}>{analytics.byRiskLevel.low || 0}</Text>
-              </View>
-              <View style={styles.riskBarContainer}>
-                <View style={[
-                  styles.riskBarFill,
-                  { 
-                    backgroundColor: '#22c55e',
-                    width: analytics.total > 0 ? `${(analytics.byRiskLevel.low || 0) / analytics.total * 100}%` : '0%'
-                  }
-                ]} />
-              </View>
-            </View>
-
-            <View style={styles.riskBar}>
-              <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>Medium</Text>
-                <Text style={styles.riskBarValue}>{analytics.byRiskLevel.medium || 0}</Text>
-              </View>
-              <View style={styles.riskBarContainer}>
-                <View style={[
-                  styles.riskBarFill,
-                  { 
-                    backgroundColor: '#f59e0b',
-                    width: analytics.total > 0 ? `${(analytics.byRiskLevel.medium || 0) / analytics.total * 100}%` : '0%'
-                  }
-                ]} />
-              </View>
-            </View>
-
-            <View style={styles.riskBar}>
-              <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>High</Text>
-                <Text style={styles.riskBarValue}>{analytics.byRiskLevel.high || 0}</Text>
-              </View>
-              <View style={styles.riskBarContainer}>
-                <View style={[
-                  styles.riskBarFill,
-                  { 
-                    backgroundColor: '#ef4444',
-                    width: analytics.total > 0 ? `${(analytics.byRiskLevel.high || 0) / analytics.total * 100}%` : '0%'
-                  }
-                ]} />
-              </View>
-            </View>
-
-            <View style={styles.riskBar}>
-              <View style={styles.riskBarLabels}>
-                <Text style={styles.riskBarLabel}>Critical</Text>
-                <Text style={styles.riskBarValue}>{analytics.byRiskLevel.critical || 0}</Text>
-              </View>
-              <View style={styles.riskBarContainer}>
-                <View style={[
-                  styles.riskBarFill,
-                  { 
-                    backgroundColor: '#991b1b',
-                    width: analytics.total > 0 ? `${(analytics.byRiskLevel.critical || 0) / analytics.total * 100}%` : '0%'
-                  }
-                ]} />
-              </View>
-            </View>
           </View>
         </View>
 

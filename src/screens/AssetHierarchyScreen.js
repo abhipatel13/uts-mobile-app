@@ -125,37 +125,45 @@ const AssetHierarchyScreen = () => {
 
   const renderAssetItem = ({ item }) => {
     const isExpanded = expandedItems[item.id];
-    const indentWidth = item.level * 20; // 20px per level
+    const indentWidth = item.level * 24; // 24px per level, matching AssetSelector
 
     return (
       <View style={styles.assetItem}>
         <TouchableOpacity 
-          style={[styles.assetRow, { paddingLeft: 20 + indentWidth }]}
+          style={[styles.assetRow, { paddingLeft: 16 + indentWidth }]}
           onPress={() => item.hasChildren && toggleExpand(item.id)}
           activeOpacity={0.7}
         >
-          <View style={styles.assetInfo}>
-            <View style={styles.expandContainer}>
-              {item.hasChildren ? (
+          <View style={styles.assetContent}>
+            {item.hasChildren ? (
+              <TouchableOpacity
+                style={styles.expandButton}
+                onPress={() => toggleExpand(item.id)}
+              >
                 <Ionicons 
                   name={isExpanded ? "chevron-down" : "chevron-forward"} 
-                  size={16} 
-                  color="#64748b" 
+                  size={18} 
+                  color="#6b7280" 
                 />
-              ) : (
-                <View style={{ width: 16 }} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.expandButtonSpacer} />
+            )}
+            
+            <View style={styles.assetInfoContainer}>
+              <View style={styles.assetMainInfo}>
+                <Text style={styles.assetId} numberOfLines={1}>
+                  {item.cmmsInternalId || item.id}
+                </Text>
+                <Text style={styles.assetName} numberOfLines={1}>
+                  {item.name || 'Unnamed Asset'}
+                </Text>
+              </View>
+              {item.description && (
+                <Text style={styles.assetDescription} numberOfLines={1}>
+                  {item.description}
+                </Text>
               )}
-              <Text style={styles.assetId} numberOfLines={1}>
-                {item.cmmsInternalId || item.id}
-              </Text>
-            </View>
-            <View style={styles.assetDetails}>
-              <Text style={styles.assetName} numberOfLines={1}>
-                {item.name || ''}
-              </Text>
-              <Text style={styles.assetType} numberOfLines={1}>
-                {item.objectType || (item.parent ? 'Child Asset' : 'Root Asset')}
-              </Text>
             </View>
           </View>
           <TouchableOpacity 
@@ -232,21 +240,6 @@ const AssetHierarchyScreen = () => {
         scrollEventThrottle={16}
       >
         <View style={styles.contentWrapper}>
-          {/* Table Header */}
-          {flattenedAssets.length > 0 && (
-            <View style={styles.tableHeader}>
-              <View style={styles.headerContent}>
-                <View style={styles.headerIdSection}>
-                  <View style={styles.headerExpandSpacer} />
-                  <Text style={styles.columnHeader}>ID</Text>
-                </View>
-                <View style={styles.headerNameSection}>
-                  <Text style={styles.columnHeader}>NAME</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
           {/* Asset List */}
           {flattenedAssets.length > 0 ? (
             <FlatList
@@ -322,95 +315,72 @@ const styles = StyleSheet.create({
   contentWrapper: {
     minWidth: '100%',
   },
-  tableHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#f1f5f9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#cbd5e1',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  headerIdSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 20,
-    flexShrink: 0,
-  },
-  headerExpandSpacer: {
-    width: 16,
-    marginRight: 8,
-  },
-  headerNameSection: {
-    flex: 1,
-    marginLeft: 20,
-    minWidth: 0,
-  },
-  columnHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    fontFamily: 'System',
-  },
   assetList: {
     flex: 1,
   },
   assetItem: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    // No border - cleaner hierarchy look
   },
   assetRow: {
+    paddingVertical: 8,
+    paddingRight: 16,
+    minHeight: 44, // Ensure touch target size
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
   },
-  assetInfo: {
+  assetContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexShrink: 0,
     flex: 1,
+  },
+  expandButton: {
+    padding: 8,
+    marginRight: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 32,
+    height: 32,
+  },
+  expandButtonSpacer: {
+    width: 32,
+    marginRight: 4,
+  },
+  assetInfoContainer: {
+    flex: 1,
+    paddingTop: 2,
+    flexShrink: 0,
     minWidth: 0,
   },
-  expandContainer: {
+  assetMainInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 20,
     flexShrink: 0,
   },
   assetId: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1e293b',
-    marginLeft: 8,
     fontFamily: 'System',
+    marginRight: 8,
     flexShrink: 0,
-  },
-  assetDetails: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    flex: 1,
-    marginLeft: 20,
-    minWidth: 0,
   },
   assetName: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1e293b',
-    marginBottom: 2,
+    flexShrink: 0,
     fontFamily: 'System',
-    textAlign: 'right',
   },
-  assetType: {
+  assetDescription: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1e293b',
+    marginTop: 4,
     fontFamily: 'System',
+    flexShrink: 0,
   },
   infoButton: {
     padding: 4,
