@@ -40,11 +40,12 @@ class LocationService {
    */
   async requestLocationPermissions() {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      this.locationPermission = status;
-      
-      if (status !== 'granted') {
-        throw new Error('Location permission not granted');
+      const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+      if (existingStatus !== 'granted') {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        this.locationPermission = status;
+      } else {
+        this.locationPermission = existingStatus;
       }
     } catch (error) {
       console.error('Error requesting location permission:', error);

@@ -85,6 +85,7 @@ export default function LoginScreen({ navigation }) {
 
       // Fetch complete user information using UserService
       try {
+        await AsyncStorage.setItem('authToken', token);
         const userResponse = await UserService.getOne(user._id);
         
         if (userResponse && userResponse.data) {
@@ -117,7 +118,6 @@ export default function LoginScreen({ navigation }) {
         }));
       }
 
-      await AsyncStorage.setItem('authToken', token);
       // Trigger immediate auth refresh to navigate to dashboard
       triggerAuthRefresh();
 
