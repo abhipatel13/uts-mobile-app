@@ -231,11 +231,6 @@ const AssetSelector = ({
                     {asset.name || 'Unnamed Asset'}
                   </Text>
                 </View>
-                {asset.description && (
-                  <Text style={[styles.assetDescription, isSelected && styles.selectedText]} numberOfLines={1}>
-                    {asset.description}
-                  </Text>
-                )}
               </View>
             </View>
           </TouchableOpacity>
