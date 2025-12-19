@@ -83,6 +83,7 @@ export const AssetHierarchyService = {
             type: asset.objectType || 'Unknown',
             parent_id: asset.parent || null,
             hierarchy_path: asset.hierarchyPath || '',
+            external_id: asset.externalId || null,
             metadata: JSON.stringify({
               cmmsInternalId: asset.cmmsInternalId,
               objectType: asset.objectType,
@@ -92,6 +93,7 @@ export const AssetHierarchyService = {
               company: asset.company,
               createdAt: asset.createdAt,
               updatedAt: asset.updatedAt,
+              parentExternalId: asset.parentExternalId || null,
               // Store any additional fields
               ...asset
             }),
@@ -132,14 +134,15 @@ export const AssetHierarchyService = {
             try {
               await DatabaseService.executeQuery(`
                 INSERT INTO assets 
-                (id, name, type, parent_id, hierarchy_path, metadata, synced, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, name, type, parent_id, hierarchy_path, external_id, metadata, synced, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               `, [
                 assetData.id,
                 assetData.name,
                 assetData.type,
                 assetData.parent_id,
                 assetData.hierarchy_path,
+                assetData.external_id,
                 assetData.metadata,
                 assetData.synced,
                 Math.floor(Date.now() / 1000),
@@ -243,6 +246,8 @@ export const AssetHierarchyService = {
           objectType: cached.type,
           parent: cached.parent_id,
           hierarchyPath: cached.hierarchy_path,
+          externalId: cached.external_id || metadata.externalId || null,
+          parentExternalId: metadata.parentExternalId || null,
           cmmsInternalId: metadata.cmmsInternalId,
           description: metadata.description,
           location: metadata.location,
@@ -296,6 +301,8 @@ export const AssetHierarchyService = {
           objectType: cachedAsset.type,
           parent: cachedAsset.parent_id,
           hierarchyPath: cachedAsset.hierarchy_path,
+          externalId: cachedAsset.external_id || metadata.externalId || null,
+          parentExternalId: metadata.parentExternalId || null,
           ...metadata
         };
 

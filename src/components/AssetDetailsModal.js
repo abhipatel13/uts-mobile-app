@@ -74,7 +74,7 @@ const AssetDetailsModal = ({
         <View style={styles.headerRow}>
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>{asset.name || 'Asset'}</Text>
-            <Text style={styles.headerSubtitle}>ID: {asset.cmmsInternalId || asset.id}</Text>
+            <Text style={styles.headerSubtitle}>ID: {asset.externalId || asset.id}</Text>
           </View>
           <View style={[
             styles.statusBadge,
@@ -107,10 +107,20 @@ const AssetDetailsModal = ({
           <View style={styles.infoItem}>
             <Ionicons name="finger-print-outline" size={20} color="#64748b" />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Internal ID</Text>
-              <Text style={styles.infoValue}>{asset.cmmsInternalId || asset.id || 'N/A'}</Text>
+              <Text style={styles.infoLabel}>Asset ID</Text>
+              <Text style={styles.infoValue}>{asset.externalId || asset.id || 'N/A'}</Text>
             </View>
           </View>
+
+          {asset.cmmsInternalId && (
+            <View style={styles.infoItem}>
+              <Ionicons name="barcode-outline" size={20} color="#64748b" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>CMMS Internal ID</Text>
+                <Text style={styles.infoValue}>{asset.cmmsInternalId}</Text>
+              </View>
+            </View>
+          )}
 
           <View style={styles.infoItem}>
             <Ionicons name="layers-outline" size={20} color="#64748b" />
@@ -146,7 +156,9 @@ const AssetDetailsModal = ({
             <Ionicons name="git-branch-outline" size={20} color="#64748b" />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Parent Asset</Text>
-              <Text style={styles.infoValue}>{asset.parent ? 'Yes' : 'Root Asset'}</Text>
+              <Text style={styles.infoValue}>
+                {asset.parentExternalId || (asset.parent ? 'Has Parent' : 'Root Asset')}
+              </Text>
             </View>
           </View>
 

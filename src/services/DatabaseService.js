@@ -275,6 +275,20 @@ class DatabaseService {
         }
       }
 
+      // Check and add external_id column to assets (for new internal/external ID system)
+      const hasExternalIdColumn = await this.columnExists('assets', 'external_id');
+      if (!hasExternalIdColumn) {
+        try {
+          await this.db.runAsync('ALTER TABLE assets ADD COLUMN external_id TEXT');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // Column already exists, skip
+          } else {
+            throw error;
+          }
+        }
+      }
+
       // console.log('Database migrations completed successfully');
     } catch (error) {
       console.error('Error running migrations:', error);

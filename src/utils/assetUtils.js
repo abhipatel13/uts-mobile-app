@@ -106,7 +106,7 @@ export function getAssetPath(assetId, assets) {
 }
 
 /**
- * Search assets by name or ID
+ * Search assets by name or External ID
  * @param {Array} assets - All assets
  * @param {string} searchTerm - Search term
  * @returns {Array} - Matching assets
@@ -119,8 +119,8 @@ export function searchAssets(assets, searchTerm) {
   const term = searchTerm.toLowerCase().trim();
   
   return assets.filter(asset =>
-    asset.name.toLowerCase().includes(term) ||
-    asset.id.toLowerCase().includes(term) ||
+    asset.name?.toLowerCase().includes(term) ||
+    asset.externalId?.toLowerCase().includes(term) ||
     asset.cmmsInternalId?.toLowerCase().includes(term) ||
     asset.functionalLocation?.toLowerCase().includes(term) ||
     asset.description?.toLowerCase().includes(term)

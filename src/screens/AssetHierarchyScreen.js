@@ -153,7 +153,7 @@ const AssetHierarchyScreen = () => {
             <View style={styles.assetInfoContainer}>
               <View style={styles.assetMainInfo}>
                 <Text style={styles.assetId} numberOfLines={1}>
-                  {item.cmmsInternalId || item.id}
+                  {item.externalId || item.id}
                 </Text>
                 <Text style={styles.assetName} numberOfLines={1}>
                   {item.name || 'Unnamed Asset'}

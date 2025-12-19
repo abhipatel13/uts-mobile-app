@@ -103,7 +103,7 @@ const AssetSelector = ({
     const directMatches = assets.filter(asset => 
       (asset.name && asset.name.toLowerCase().includes(searchLower)) ||
       (asset.description && asset.description.toLowerCase().includes(searchLower)) ||
-      (asset.id && asset.id.toLowerCase().includes(searchLower)) ||
+      (asset.externalId && asset.externalId.toLowerCase().includes(searchLower)) ||
       (asset.cmmsInternalId && asset.cmmsInternalId.toLowerCase().includes(searchLower)) ||
       (asset.functionalLocation && asset.functionalLocation.toLowerCase().includes(searchLower))
     );
@@ -179,10 +179,11 @@ const AssetSelector = ({
     const selectedAsset = assets.find(asset => asset.id === value);
     if (!selectedAsset) return 'Unknown Asset';
     
-    // Format like web interface: ID on left, name and description on right
+    // Format like web interface: External ID on left, name and description on right
+    const displayId = selectedAsset.externalId || selectedAsset.id;
     const name = selectedAsset.name || 'Unnamed Asset';
     const description = selectedAsset.description ? ` - ${selectedAsset.description}` : '';
-    return `${selectedAsset.id}    ${name}${description}`;
+    return `${displayId}    ${name}${description}`;
   };
 
   // Render asset hierarchy recursively
@@ -225,7 +226,7 @@ const AssetSelector = ({
               <View style={styles.assetInfoContainer}>
                 <View style={styles.assetMainInfo}>
                   <Text style={[styles.assetId, isSelected && styles.selectedText]} numberOfLines={1}>
-                    {asset.id}
+                    {asset.externalId || asset.id}
                   </Text>
                   <Text style={[styles.assetName, isSelected && styles.selectedText]} numberOfLines={1}>
                     {asset.name || 'Unnamed Asset'}

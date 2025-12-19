@@ -13,12 +13,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RiskAssessmentService } from '../services';
+import { AssetHierarchyService } from '../services/AssetHierarchyService';
 import AddRiskAssessmentModal from '../components/AddRiskAssessmentModal';
 import EditRiskAssessmentModal from '../components/EditRiskAssessmentModal';
 import RiskAssessmentDetailsModal from '../components/RiskAssessmentDetailsModal';
 
 const RiskAssessmentScreen = () => {
   const [riskAssessments, setRiskAssessments] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -33,11 +35,25 @@ const RiskAssessmentScreen = () => {
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'active', 'completed', 'draft'
   const [pendingCount, setPendingCount] = useState(0);
 
-  // Load risk assessments on component mount
+  // Load risk assessments and assets on component mount
   useEffect(() => {
     fetchRiskAssessments();
+    fetchAssets();
     checkPendingSync();
   }, []);
+
+  // Fetch assets for display purposes (to show externalId instead of UUID)
+  const fetchAssets = async () => {
+    try {
+      const response = await AssetHierarchyService.getAll();
+      if (response.data && Array.isArray(response.data)) {
+        setAssets(response.data);
+      }
+    } catch (error) {
+      // Silently fail - assets are only needed for display enhancement
+      console.warn('Failed to load assets for display:', error.message);
+    }
+  };
 
   const checkPendingSync = async () => {
     try {
@@ -517,6 +533,7 @@ const RiskAssessmentScreen = () => {
         riskAssessment={selectedRiskAssessment}
         getRiskColor={getRiskColor}
         getStatusColor={getStatusColor}
+        assets={assets}
       />
     </View>
   );

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TaskHazardService } from '../services/TaskHazardService';
+import { AssetHierarchyService } from '../services/AssetHierarchyService';
 import AddTaskHazardModal from '../components/AddTaskHazardModal';
 import EditTaskHazardModal from '../components/EditTaskHazardModal';
 import TaskHazardDetailsModal from '../components/TaskHazardDetailsModal';
@@ -21,6 +22,7 @@ import TaskHazardMapView from '../components/TaskHazardMapView';
 
 const TaskHazardScreen = () => {
   const [taskHazards, setTaskHazards] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -34,10 +36,24 @@ const TaskHazardScreen = () => {
   const [dataSource, setDataSource] = useState('api'); // 'api' or 'cache'
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'active', 'completed', 'draft'
 
-  // Load task hazards on component mount
+  // Load task hazards and assets on component mount
   useEffect(() => {
     fetchTaskHazards();
+    fetchAssets();
   }, []);
+
+  // Fetch assets for display purposes (to show externalId instead of UUID)
+  const fetchAssets = async () => {
+    try {
+      const response = await AssetHierarchyService.getAll();
+      if (response.data && Array.isArray(response.data)) {
+        setAssets(response.data);
+      }
+    } catch (error) {
+      // Silently fail - assets are only needed for display enhancement
+      console.warn('Failed to load assets for display:', error.message);
+    }
+  };
 
   const fetchTaskHazards = async (isRefresh = false) => {
     try {
@@ -509,6 +525,7 @@ const TaskHazardScreen = () => {
         taskHazard={selectedTaskHazard}
         getRiskColor={getRiskColor}
         getStatusColor={getStatusColor}
+        assets={assets}
       />
     </View>
   );

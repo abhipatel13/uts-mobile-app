@@ -20,11 +20,22 @@ const RiskAssessmentDetailsModal = ({
   onClose, 
   riskAssessment,
   getRiskColor,
-  getStatusColor 
+  getStatusColor,
+  assets = []
 }) => {
   const [activeTab, setActiveTab] = useState('details');
 
   if (!riskAssessment) return null;
+
+  // Helper to get asset display name (externalId) from assetSystem (internal UUID)
+  const getAssetDisplayName = (assetSystemId) => {
+    if (!assetSystemId) return 'Not specified';
+    const asset = assets.find(a => a.id === assetSystemId);
+    if (asset) {
+      return asset.externalId || asset.name || assetSystemId;
+    }
+    return assetSystemId; // Fallback to raw value if asset not found
+  };
 
   const riskCount = riskAssessment.risks?.length || 0;
   const individualCount = (() => {
@@ -217,7 +228,7 @@ const RiskAssessmentDetailsModal = ({
             <Ionicons name="build-outline" size={20} color="#64748b" />
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Asset System</Text>
-              <Text style={styles.infoValue}>{riskAssessment.assetSystem || 'Not specified'}</Text>
+              <Text style={styles.infoValue}>{getAssetDisplayName(riskAssessment.assetSystem)}</Text>
             </View>
           </View>
         </View>
