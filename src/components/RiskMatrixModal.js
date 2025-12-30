@@ -10,6 +10,8 @@ import {
   Dimensions,
   SafeAreaView,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
 
 const RiskMatrixModal = ({ 
@@ -206,41 +208,60 @@ const RiskMatrixModal = ({
           </View>
 
           {/* Risk Matrix */}
-          <View style={styles.matrixContainer}>
-            {/* Headers */}
-            <View style={styles.matrixHeader}>
-              <View style={styles.probabilityHeader}>
-                <Text style={styles.headerText}>Probability</Text>
-                <Text style={styles.headerSubtext}>Severity →</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={true}
+            style={styles.matrixScrollContainer}
+            contentContainerStyle={styles.matrixScrollContent}
+          >
+            <View style={styles.matrixContainer}>
+              {/* Headers */}
+              <View style={styles.matrixHeader}>
+                <View style={styles.probabilityHeader}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.headerTextScroll}>
+                    <Text style={styles.headerText}>Probability</Text>
+                  </ScrollView>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.headerSubtextScroll}>
+                    <Text style={styles.headerSubtext}>Severity →</Text>
+                  </ScrollView>
+                </View>
+                
+                {/* Consequence Headers */}
+                {consequenceLabels.map((consequence, index) => (
+                  <View key={consequence.value} style={styles.consequenceHeader}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.consequenceHeaderTextScroll}>
+                      <Text style={styles.consequenceHeaderText}>{consequence.label}</Text>
+                    </ScrollView>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.consequenceHeaderSubtextScroll}>
+                      <Text style={styles.consequenceHeaderSubtext}>{consequence.description}</Text>
+                    </ScrollView>
+                    <Text style={styles.consequenceScore}>{consequence.score}</Text>
+                  </View>
+                ))}
               </View>
-              
-              {/* Consequence Headers */}
-              {consequenceLabels.map((consequence, index) => (
-                <View key={consequence.value} style={styles.consequenceHeader}>
-                  <Text style={styles.consequenceHeaderText}>{consequence.label}</Text>
-                  <Text style={styles.consequenceHeaderSubtext}>{consequence.description}</Text>
-                  <Text style={styles.consequenceScore}>{consequence.score}</Text>
+
+              {/* Matrix Rows */}
+              {likelihoodLabels.map((likelihood, likelihoodIndex) => (
+                <View key={likelihood.value} style={styles.matrixRow}>
+                  {/* Likelihood Header */}
+                  <View style={styles.likelihoodHeader}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.likelihoodHeaderTextScroll}>
+                      <Text style={styles.likelihoodHeaderText}>{likelihood.label}</Text>
+                    </ScrollView>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.likelihoodHeaderSubtextScroll}>
+                      <Text style={styles.likelihoodHeaderSubtext}>{likelihood.description}</Text>
+                    </ScrollView>
+                    <Text style={styles.likelihoodScore}>{likelihood.score}</Text>
+                  </View>
+                  
+                  {/* Matrix Cells */}
+                  {consequenceLabels.map((_, consequenceIndex) => 
+                    renderMatrixCell(likelihoodIndex, consequenceIndex)
+                  )}
                 </View>
               ))}
             </View>
-
-            {/* Matrix Rows */}
-            {likelihoodLabels.map((likelihood, likelihoodIndex) => (
-              <View key={likelihood.value} style={styles.matrixRow}>
-                {/* Likelihood Header */}
-                <View style={styles.likelihoodHeader}>
-                  <Text style={styles.likelihoodHeaderText}>{likelihood.label}</Text>
-                  <Text style={styles.likelihoodHeaderSubtext}>{likelihood.description}</Text>
-                  <Text style={styles.likelihoodScore}>{likelihood.score}</Text>
-                </View>
-                
-                {/* Matrix Cells */}
-                {consequenceLabels.map((_, consequenceIndex) => 
-                  renderMatrixCell(likelihoodIndex, consequenceIndex)
-                )}
-              </View>
-            ))}
-          </View>
+          </ScrollView>
 
           {/* Risk Legend */}
           <View style={styles.riskLegend}>
@@ -369,106 +390,129 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  matrixContainer: {
+  matrixScrollContainer: {
     marginBottom: 20,
+  },
+  matrixScrollContent: {
+    flexGrow: 0,
+  },
+  matrixContainer: {
+    minWidth: SCREEN_WIDTH - 32, // Minimum width to fit screen
   },
   matrixHeader: {
     flexDirection: 'row',
     marginBottom: 0,
   },
   probabilityHeader: {
-    flex: 1,
-    aspectRatio: 1,
+    minWidth: 80, // Minimum width to fit text
+    width: 80,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
-    minHeight: 60,
-    minWidth: 60,
     borderRadius: 0,
     borderWidth: 0,
   },
   headerText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#374151',
+    flexShrink: 0,
   },
   headerSubtext: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#6b7280',
     marginTop: 2,
+    flexShrink: 0,
+  },
+  headerTextScroll: {
+    flexShrink: 1,
+  },
+  headerSubtextScroll: {
+    flexShrink: 1,
   },
   consequenceHeader: {
-    flex: 1,
-    aspectRatio: 1,
+    minWidth: 70, // Minimum width to fit text
+    width: 70,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
-    minHeight: 60,
-    minWidth: 60,
     borderRadius: 0,
     borderWidth: 0,
   },
   consequenceHeaderText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#374151',
     textAlign: 'center',
+    flexShrink: 0,
   },
   consequenceHeaderSubtext: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#6b7280',
     textAlign: 'center',
     marginTop: 2,
+    flexShrink: 0,
+  },
+  consequenceHeaderTextScroll: {
+    flexShrink: 1,
+  },
+  consequenceHeaderSubtextScroll: {
+    flexShrink: 1,
   },
   consequenceScore: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginTop: 2,
+    marginTop: 1,
   },
   matrixRow: {
     flexDirection: 'row',
     marginBottom: 0,
   },
   likelihoodHeader: {
-    flex: 1,
-    aspectRatio: 1,
+    minWidth: 80, // Minimum width to fit text
+    width: 80,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 4,
     backgroundColor: '#f8fafc',
-    minHeight: 60,
-    minWidth: 60,
     borderRadius: 0,
     borderWidth: 0,
   },
   likelihoodHeaderText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#374151',
     textAlign: 'center',
+    flexShrink: 0,
   },
   likelihoodHeaderSubtext: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#6b7280',
     textAlign: 'center',
     marginTop: 2,
+    flexShrink: 0,
+  },
+  likelihoodHeaderTextScroll: {
+    flexShrink: 1,
+  },
+  likelihoodHeaderSubtextScroll: {
+    flexShrink: 1,
   },
   likelihoodScore: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginTop: 2,
+    marginTop: 1,
   },
   matrixCell: {
-    flex: 1,
+    minWidth: 70, // Match consequence header width
+    width: 70,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     margin: 0,
     borderRadius: 0,
-    minHeight: 60,
-    minWidth: 60,
     borderWidth: 0,
   },
   selectedCell: {
@@ -477,7 +521,7 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   matrixCellText: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
   },

@@ -311,6 +311,25 @@ const TaskHazardScreen = () => {
                 </Text>
               )}
             </View>
+
+            {/* Rejection Reason - Show for rejected items */}
+            {item.status === 'Rejected' && (() => {
+              const latestApproval = item.approvals?.find(approval => approval.isLatest) || item.approvals?.[0];
+              if (latestApproval?.comments || latestApproval?.status === 'rejected') {
+                return (
+                  <View style={styles.rejectionSection}>
+                    <View style={styles.rejectionHeader}>
+                      <Ionicons name="close-circle" size={16} color="#ef4444" />
+                      <Text style={styles.rejectionTitle}>Rejection Reason</Text>
+                    </View>
+                    <Text style={styles.rejectionText} numberOfLines={2}>
+                      {latestApproval?.comments || 'No reason provided for rejection.'}
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
           </View>
           
           <View style={styles.actionButtons}>

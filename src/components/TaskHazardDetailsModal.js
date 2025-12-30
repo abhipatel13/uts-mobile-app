@@ -90,7 +90,9 @@ const TaskHazardDetailsModal = ({
       <View style={styles.headerCard}>
         <View style={styles.headerRow}>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>{taskHazard.scopeOfWork || 'Task Hazard'}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.headerTitleScroll}>
+              <Text style={styles.headerTitle}>{taskHazard.scopeOfWork || 'Task Hazard'}</Text>
+            </ScrollView>
             <Text style={styles.headerSubtitle}>ID: {taskHazard.id}</Text>
           </View>
           <View style={[
@@ -106,9 +108,11 @@ const TaskHazardDetailsModal = ({
             <Text style={styles.riskLabel}>Risk Level:</Text>
           </View>
           <View style={styles.riskDetailsRow}>
-            <Text style={styles.riskDetailsText}>
-              Likelihood: {highestRiskData.asIsLikelihood || 'Not specified'} | Consequence: {highestRiskData.asIsConsequence || 'Not specified'}
-            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.riskDetailsScroll}>
+              <Text style={styles.riskDetailsText}>
+                Likelihood: {highestRiskData.asIsLikelihood || 'Not specified'} | Consequence: {highestRiskData.asIsConsequence || 'Not specified'}
+              </Text>
+            </ScrollView>
           </View>
         </View>
       </View>
@@ -121,9 +125,11 @@ const TaskHazardDetailsModal = ({
             <Ionicons name="calendar-outline" size={20} color="#64748b" />
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Date & Time</Text>
-              <Text style={styles.infoValue}>
-                {taskHazard.date} {taskHazard.time}
-              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.infoValueScroll}>
+                <Text style={styles.infoValue}>
+                  {taskHazard.date} {taskHazard.time}
+                </Text>
+              </ScrollView>
             </View>
           </View>
           
@@ -131,7 +137,9 @@ const TaskHazardDetailsModal = ({
             <Ionicons name="location-outline" size={20} color="#64748b" />
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{taskHazard.location || 'Not specified'}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.infoValueScroll}>
+                <Text style={styles.infoValue}>{taskHazard.location || 'Not specified'}</Text>
+              </ScrollView>
             </View>
           </View>
           
@@ -139,7 +147,9 @@ const TaskHazardDetailsModal = ({
             <Ionicons name="person-outline" size={20} color="#64748b" />
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Supervisor</Text>
-              <Text style={styles.infoValue}>{taskHazard.supervisor || 'Not assigned'}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.infoValueScroll}>
+                <Text style={styles.infoValue}>{taskHazard.supervisor || 'Not assigned'}</Text>
+              </ScrollView>
             </View>
           </View>
           
@@ -147,7 +157,9 @@ const TaskHazardDetailsModal = ({
             <Ionicons name="build-outline" size={20} color="#64748b" />
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Asset System</Text>
-              <Text style={styles.infoValue}>{taskHazard.assetSystem || 'Not specified'}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.infoValueScroll}>
+                <Text style={styles.infoValue}>{taskHazard.assetSystem || 'Not specified'}</Text>
+              </ScrollView>
             </View>
           </View>
         </View>
@@ -185,12 +197,40 @@ const TaskHazardDetailsModal = ({
             {individuals.map((individual, index) => (
               <View key={index} style={styles.individualItem}>
                 <Ionicons name="person" size={16} color="#64748b" />
-                <Text style={styles.individualName}>{individual}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.individualNameScroll}>
+                  <Text style={styles.individualName}>{individual}</Text>
+                </ScrollView>
               </View>
             ))}
           </View>
         </View>
       )}
+
+      {/* Rejection Reason - Show prominently for rejected items */}
+      {taskHazard.status === 'Rejected' && (() => {
+        const latestApproval = taskHazard.approvals?.find(approval => approval.isLatest) || taskHazard.approvals?.[0];
+        if (latestApproval?.comments || latestApproval?.status === 'rejected') {
+          return (
+            <View style={styles.rejectionCard}>
+              <View style={styles.rejectionHeader}>
+                <Ionicons name="close-circle" size={24} color="#ef4444" />
+                <Text style={styles.rejectionTitle}>Rejection Reason</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.rejectionTextScroll}>
+                <Text style={styles.rejectionText}>
+                  {latestApproval?.comments || 'No reason provided for rejection.'}
+                </Text>
+              </ScrollView>
+              {latestApproval?.processedAt && (
+                <Text style={styles.rejectionDate}>
+                  Rejected on: {formatDateTime(latestApproval.processedAt)}
+                </Text>
+              )}
+            </View>
+          );
+        }
+        return null;
+      })()}
 
       {/* Metadata */}
       <View style={styles.sectionCard}>
@@ -200,7 +240,9 @@ const TaskHazardDetailsModal = ({
             <Ionicons name="time-outline" size={20} color="#64748b" />
             <View style={styles.infoText}>
               <Text style={styles.infoLabel}>Created</Text>
-              <Text style={styles.infoValue}>{formatDateTime(taskHazard.createdAt)}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.infoValueScroll}>
+                <Text style={styles.infoValue}>{formatDateTime(taskHazard.createdAt)}</Text>
+              </ScrollView>
             </View>
           </View>
           
@@ -209,7 +251,9 @@ const TaskHazardDetailsModal = ({
               <Ionicons name="refresh-outline" size={20} color="#64748b" />
               <View style={styles.infoText}>
                 <Text style={styles.infoLabel}>Last Updated</Text>
-                <Text style={styles.infoValue}>{formatDateTime(taskHazard.updatedAt)}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.infoValueScroll}>
+                  <Text style={styles.infoValue}>{formatDateTime(taskHazard.updatedAt)}</Text>
+                </ScrollView>
               </View>
             </View>
           )}
@@ -232,7 +276,9 @@ const TaskHazardDetailsModal = ({
             return (
               <View key={index} style={styles.riskCard}>
                 <View style={styles.riskHeader}>
-                  <Text style={styles.riskTitle}>{risk.hazard || `Risk ${index + 1}`}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.riskTitleScroll}>
+                    <Text style={styles.riskTitle}>{risk.hazard || `Risk ${index + 1}`}</Text>
+                  </ScrollView>
                   <View style={[
                     styles.riskScoreBadge,
                     { backgroundColor: getRiskColor ? getRiskColor(riskScore) : '#6b7280' }
@@ -245,7 +291,9 @@ const TaskHazardDetailsModal = ({
                 </View>
                 
                 {risk.description && (
-                  <Text style={styles.riskDescription}>{risk.description}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.riskDescriptionScroll}>
+                    <Text style={styles.riskDescription}>{risk.description}</Text>
+                  </ScrollView>
                 )}
                 
                 <View style={styles.riskMetrics}>
@@ -262,7 +310,9 @@ const TaskHazardDetailsModal = ({
                 {risk.controls && (
                   <View style={styles.controlsSection}>
                     <Text style={styles.controlsTitle}>Controls:</Text>
-                    <Text style={styles.controlsText}>{risk.controls}</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.controlsTextScroll}>
+                      <Text style={styles.controlsText}>{risk.controls}</Text>
+                    </ScrollView>
                   </View>
                 )}
               </View>
@@ -421,6 +471,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1e293b',
     marginBottom: 4,
+    flexShrink: 0,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -471,6 +522,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     fontStyle: 'italic',
+    flexShrink: 0,
   },
   sectionCard: {
     backgroundColor: '#fff',
@@ -506,6 +558,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1e293b',
     fontWeight: '500',
+    flexShrink: 0,
   },
   requirementsList: {
     gap: 12,
@@ -534,6 +587,7 @@ const styles = StyleSheet.create({
   individualName: {
     fontSize: 14,
     color: '#374151',
+    flexShrink: 0,
   },
   risksHeader: {
     marginBottom: 20,
@@ -566,7 +620,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
-    flex: 1,
+    flexShrink: 0,
     marginRight: 12,
   },
   riskScoreBadge: {
@@ -593,6 +647,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginBottom: 12,
     lineHeight: 20,
+    flexShrink: 0,
   },
   riskMetrics: {
     flexDirection: 'row',
@@ -631,6 +686,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748b',
     lineHeight: 20,
+    flexShrink: 0,
   },
   noRisksContainer: {
     flex: 1,
@@ -650,6 +706,63 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  rejectionCard: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  rejectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  rejectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  rejectionText: {
+    fontSize: 14,
+    color: '#991b1b',
+    lineHeight: 20,
+    marginBottom: 8,
+    flexShrink: 0,
+  },
+  rejectionDate: {
+    fontSize: 12,
+    color: '#b91c1c',
+    fontStyle: 'italic',
+  },
+  headerTitleScroll: {
+    flexShrink: 1,
+  },
+  infoValueScroll: {
+    flexShrink: 1,
+  },
+  individualNameScroll: {
+    flexShrink: 1,
+  },
+  rejectionTextScroll: {
+    flexShrink: 1,
+  },
+  riskTitleScroll: {
+    flex: 1,
+    marginRight: 12,
+    minWidth: 0,
+  },
+  riskDescriptionScroll: {
+    flexShrink: 1,
+  },
+  controlsTextScroll: {
+    flexShrink: 1,
+  },
+  riskDetailsScroll: {
+    flexShrink: 1,
   },
 });
 
