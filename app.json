@@ -47,7 +47,17 @@
     },
     "owner": "abhipatel8675",
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/uts-logo.png",
+          "color": "#34495e",
+          "sounds": [
+            "./assets/notification.wav"
+          ]
+        }
+      ]
     ]
   }
 }

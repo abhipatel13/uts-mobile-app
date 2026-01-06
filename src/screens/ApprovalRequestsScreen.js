@@ -212,7 +212,7 @@ const ApprovalRequestsScreen = () => {
     setShowApprovalModal(true);
   };
 
-  const handleApproveWithSignature = async (signature) => {
+  const handleApproveWithSignature = async (signature, notes = '') => {
     if (!selectedRequest?.id && !selectedRequest?._id) {
       throw new Error('Task hazard ID is missing');
     }
@@ -231,9 +231,12 @@ const ApprovalRequestsScreen = () => {
       // Ensure it's a string
       const safeTaskHazardId = String(taskHazardId);
       
+      // Format comments with notes, signature, and user info
+      const formattedComments = formatComments(notes.trim(), signature, currentUser);
+      
       const approvalData = {
         status: 'Approved',
-        comments: comments.trim(),
+        comments: formattedComments,
         signature: signature,
         approvedBy: currentUser.email,
         approvedAt: new Date().toISOString()
@@ -285,7 +288,7 @@ const ApprovalRequestsScreen = () => {
     }
   };
 
-  const handleRejectWithSignature = async (signature) => {
+  const handleRejectWithSignature = async (signature, notes = '') => {
     if (!selectedRequest?.id && !selectedRequest?._id) {
       throw new Error('Task hazard ID is missing');
     }
@@ -304,9 +307,12 @@ const ApprovalRequestsScreen = () => {
       // Ensure it's a string
       const safeTaskHazardId = String(taskHazardId);
       
+      // Format comments with notes, signature, and user info
+      const formattedComments = formatComments(notes.trim(), signature, currentUser);
+      
       const rejectionData = {
         status: 'Rejected',
-        comments: comments.trim(),
+        comments: formattedComments,
         signature: signature,
         rejectedBy: currentUser.email,
         rejectedAt: new Date().toISOString()
@@ -403,6 +409,41 @@ const ApprovalRequestsScreen = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Format comments with notes, signature, and user info
+  const formatComments = (notes, signature, user) => {
+    let formatted = '';
+    
+    // Add notes if provided
+    if (notes && notes.trim()) {
+      formatted = notes.trim();
+    }
+    
+    // Add signature if provided
+    if (signature && signature.trim()) {
+      if (formatted) {
+        formatted += '\n\n';
+      }
+      formatted += `Signed by: ${signature.trim()}`;
+    }
+    
+    // Add user info
+    const userName = user?.name || user?.email || 'Supervisor';
+    if (formatted) {
+      formatted += '\n';
+    } else {
+      formatted = 'Approved/Rejected';
+    }
+    formatted += `\nProcessed by: ${userName}`;
+    if (user?.email && user.email !== userName) {
+      formatted += ` (${user.email})`;
+    }
+    
+    // Add timestamp
+    formatted += `\nDate: ${new Date().toLocaleString()}`;
+    
+    return formatted;
   };
 
   const getStatusColor = (status) => {
@@ -565,14 +606,36 @@ const ApprovalRequestsScreen = () => {
           </View>
         )}
 
-        {/* Comments if processed */}
-        {latestApproval?.comments && (
+        {/* Rejection Reason - Show prominently for rejected items */}
+        {latestApproval?.status === 'rejected' && (
+          <View style={styles.rejectionSection}>
+            <View style={styles.rejectionHeader}>
+              <Ionicons name="close-circle" size={20} color="#ef4444" />
+              <Text style={styles.rejectionTitle}>Rejection Reason</Text>
+            </View>
+            {latestApproval?.comments ? (
+              <Text style={styles.rejectionText}>{latestApproval.comments}</Text>
+            ) : (
+              <Text style={styles.rejectionText}>No reason provided for rejection.</Text>
+            )}
+            {latestApproval.processedAt && (
+              <Text style={styles.rejectionDate}>
+                Rejected on: {formatDate(latestApproval.processedAt)}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Comments if processed (for approved items) */}
+        {latestApproval?.status === 'approved' && latestApproval?.comments && (
           <View style={styles.commentsSection}>
-            <Text style={styles.commentsLabel}>Comments:</Text>
+            <Text style={styles.commentsLabel}>Notes & Comments:</Text>
             <Text style={styles.commentsText}>{latestApproval.comments}</Text>
-            <Text style={styles.processedDate}>
-              Processed: {formatDate(latestApproval.processedAt)}
-            </Text>
+            {latestApproval.processedAt && (
+              <Text style={styles.processedDate}>
+                Processed: {formatDate(latestApproval.processedAt)}
+              </Text>
+            )}
           </View>
         )}
       </View>
@@ -984,6 +1047,36 @@ const styles = StyleSheet.create({
   processedDate: {
     fontSize: 12,
     color: '#94a3b8',
+  },
+  rejectionSection: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  rejectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  rejectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  rejectionText: {
+    fontSize: 14,
+    color: '#991b1b',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  rejectionDate: {
+    fontSize: 12,
+    color: '#b91c1c',
+    fontStyle: 'italic',
   },
   loadingContainer: {
     flex: 1,

@@ -51,6 +51,13 @@ const allMenuItems = [
       { name: 'Risk Assessment', route: 'AnalyticsRiskAssessment' },
     ],
   },
+  {
+    name: 'Notifications',
+    icon: 'notifications-outline',
+    route: 'Notifications',
+    color: '#8b5cf6',
+    hasSubItems: false,
+  },
 ];
 
 export default function CustomDrawerContent(props) {
@@ -84,8 +91,8 @@ export default function CustomDrawerContent(props) {
           if (item.name === 'Dashboard') return false;
           // Remove Analytics
           if (item.name === 'Analytics') return false;
-          // Keep Asset Hierarchy and Safety
-          return item.name === 'Asset Hierarchy' || item.name === 'Safety';
+          // Keep Asset Hierarchy, Safety, and Notifications
+          return item.name === 'Asset Hierarchy' || item.name === 'Safety' || item.name === 'Notifications';
         })
         .map(item => {
           // Filter Safety subItems to only show Task Hazard
@@ -105,8 +112,8 @@ export default function CustomDrawerContent(props) {
         .filter(item => {
           // Remove Dashboard
           if (item.name === 'Dashboard') return false;
-          // Keep Asset Hierarchy, Safety, and Analytics
-          return item.name === 'Asset Hierarchy' || item.name === 'Safety' || item.name === 'Analytics';
+          // Keep Asset Hierarchy, Safety, Analytics, and Notifications
+          return item.name === 'Asset Hierarchy' || item.name === 'Safety' || item.name === 'Analytics' || item.name === 'Notifications';
         })
         .map(item => {
           // Filter Safety subItems - show all (Task Hazard, Risk Assessment, Approval Requests)
@@ -205,7 +212,14 @@ export default function CustomDrawerContent(props) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
+        <TouchableOpacity 
+          style={styles.logoContainer}
+          onPress={() => {
+            navigation.navigate('Dashboard');
+            props.onClose?.(); // Close sidebar if onClose is available
+          }}
+          activeOpacity={0.7}
+        >
           <Image 
             source={require('../../assets/uts-logo.png')} 
             style={styles.logoImage}
@@ -213,7 +227,7 @@ export default function CustomDrawerContent(props) {
             fadeDuration={0}
             backgroundColor="transparent"
           />
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Menu Items */}

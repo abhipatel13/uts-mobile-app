@@ -353,6 +353,25 @@ const RiskAssessmentScreen = () => {
                 </Text>
               )}
             </View>
+
+            {/* Rejection Reason - Show for rejected items */}
+            {item.status === 'Rejected' && (() => {
+              const latestApproval = item.approvals?.find(approval => approval.isLatest) || item.approvals?.[0];
+              if (latestApproval?.comments || latestApproval?.status === 'rejected') {
+                return (
+                  <View style={styles.rejectionSection}>
+                    <View style={styles.rejectionHeader}>
+                      <Ionicons name="close-circle" size={16} color="#ef4444" />
+                      <Text style={styles.rejectionTitle}>Rejection Reason</Text>
+                    </View>
+                    <Text style={styles.rejectionText} numberOfLines={2}>
+                      {latestApproval?.comments || 'No reason provided for rejection.'}
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
           </View>
           
           <View style={styles.actionButtons}>
@@ -694,6 +713,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     fontStyle: 'italic',
+  },
+  rejectionSection: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  rejectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 6,
+  },
+  rejectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  rejectionText: {
+    fontSize: 12,
+    color: '#991b1b',
+    lineHeight: 16,
   },
   actionButtons: {
     flexDirection: 'row',

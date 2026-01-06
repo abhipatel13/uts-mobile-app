@@ -2,7 +2,7 @@ import React, { useState, useEffect, createRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Animated, Alert } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Modal, Animated, Alert, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,6 +14,7 @@ import { AssetHierarchyService } from './src/services/AssetHierarchyService';
 import RiskAssessmentService from './src/services/RiskAssessmentService';
 import { TaskHazardService } from './src/services/TaskHazardService';
 import { ApprovalService } from './src/services/ApprovalService';
+import PushNotificationService from './src/services/PushNotificationService';
 import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { setGlobalLogoutHandler, setGlobalAuthRefreshHandler } from './src/utils/globalHandlers';
 
@@ -30,6 +31,8 @@ import RiskAssessmentScreen from './src/screens/RiskAssessmentScreen';
 import TaskHazardAnalyticsScreen from './src/screens/TaskHazardAnalyticsScreen';
 import RiskAssessmentAnalyticsScreen from './src/screens/RiskAssessmentAnalyticsScreen';
 import ApprovalRequestsScreen from './src/screens/ApprovalRequestsScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
+import NotificationBell from './src/components/NotificationBell';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,7 +51,7 @@ function HeaderMenuButton({ onPress }) {
 // Custom GPS Header Button Component
 function HeaderGPSButton({ locationStatus, onPress }) {
   const isLocationActive = locationStatus?.hasPermission;
-  const iconName = isLocationActive ? "location-outline" : "location-off-outline";
+  const iconName = isLocationActive ? "location-outline" : "close-circle-outline";
   const iconColor = isLocationActive ? "#22c55e" : "#ef4444";
   
   return (
@@ -145,6 +148,21 @@ function MainAppNavigator({ currentUserRole }) {
     // Get initial location status
     const location = LocationService.getLocationStatus();
     setLocationStatus(location);
+
+    // Setup push notification listeners
+    // Use a small delay to ensure navigation is ready
+    const setupNotifications = setTimeout(() => {
+      const navigation = navigationRef.current;
+      if (navigation) {
+        PushNotificationService.setupNotificationListeners(navigation);
+      }
+    }, 1000);
+
+    // Cleanup on unmount
+    return () => {
+      clearTimeout(setupNotifications);
+      PushNotificationService.removeNotificationListeners();
+    };
   }, []);
 
   const toggleSidebar = () => {
@@ -166,11 +184,14 @@ function MainAppNavigator({ currentUserRole }) {
           headerLeft: () => (
             <HeaderMenuButton onPress={toggleSidebar} />
           ),
-          headerRight: () => (
-            <HeaderGPSButton 
-              locationStatus={locationStatus}
-              onPress={() => console.log('GPS pressed')} 
-            />
+          headerRight: ({ navigation }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <NotificationBell navigation={navigation} />
+              <HeaderGPSButton 
+                locationStatus={locationStatus}
+                onPress={() => console.log('GPS pressed')} 
+              />
+            </View>
           ),
         })}
         screenListeners={{
@@ -187,9 +208,19 @@ function MainAppNavigator({ currentUserRole }) {
       <Stack.Screen 
         name="Dashboard" 
         component={DashboardScreen}
-        options={{
+        options={({ navigation }) => ({
           title: 'Utah Technical Services LLC',
-        }}
+          headerTitle: () => (
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Dashboard')}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>
+                Utah Technical Services LLC
+              </Text>
+            </TouchableOpacity>
+          ),
+        })}
       />
       <Stack.Screen 
         name="AssetHierarchy" 
@@ -240,6 +271,13 @@ function MainAppNavigator({ currentUserRole }) {
           title: 'Approval Requests',
         }}
       />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
+        }}
+      />
     </Stack.Navigator>
 
     {/* Custom Sidebar Modal */}
@@ -285,9 +323,14 @@ export default function App() {
       // Start auto-sync for approvals
       ApprovalService.startAutoSync();
       
+      // Initialize push notifications
+      await PushNotificationService.registerForPushNotifications();
+      
       // Set global logout handler
       setGlobalLogoutHandler(() => {
         setIsAuthenticated(false);
+        // Clean up push notification listeners on logout
+        PushNotificationService.removeNotificationListeners();
       });
       
       // Set global auth refresh handler
@@ -366,6 +409,14 @@ export default function App() {
           if (userRole) {
             handleRoleBasedInitialization(userRole);
           }
+
+          // Check for notification that opened the app (after authentication)
+          setTimeout(() => {
+            const navigation = navigationRef.current;
+            if (navigation) {
+              PushNotificationService.checkInitialNotification(navigation);
+            }
+          }, 2000);
         } catch (parseError) {
           console.error('Error parsing user data:', parseError);
         }

@@ -159,11 +159,6 @@ const AssetHierarchyScreen = () => {
                   {item.name || 'Unnamed Asset'}
                 </Text>
               </View>
-              {item.description && (
-                <Text style={styles.assetDescription} numberOfLines={1}>
-                  {item.description}
-                </Text>
-              )}
             </View>
           </View>
           <TouchableOpacity 

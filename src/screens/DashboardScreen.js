@@ -159,9 +159,6 @@ const DashboardScreen = ({ navigation }) => {
         </View>
       </View>
 
-
-
-
       {/* Main Dashboard Cards */}
       <View style={styles.cardsContainer}>
         {dashboardCards.map((card, index) => (

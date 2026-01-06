@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getRiskScoreLabel } from '../utils/riskUtils';
@@ -23,6 +24,7 @@ const SignatureModal = ({
   isLoading = false 
 }) => {
   const [signature, setSignature] = useState('');
+  const [notes, setNotes] = useState('');
   const [isSigning, setIsSigning] = useState(false);
 
   const handleApprove = async () => {
@@ -33,8 +35,9 @@ const SignatureModal = ({
 
     setIsSigning(true);
     try {
-      await onApprove(signature.trim());
+      await onApprove(signature.trim(), notes.trim());
       setSignature('');
+      setNotes('');
     } catch (error) {
       Alert.alert('Error', 'Failed to approve task hazard. Please try again.');
     } finally {
@@ -50,8 +53,9 @@ const SignatureModal = ({
 
     setIsSigning(true);
     try {
-      await onReject(signature.trim());
+      await onReject(signature.trim(), notes.trim());
       setSignature('');
+      setNotes('');
     } catch (error) {
       Alert.alert('Error', 'Failed to reject task hazard. Please try again.');
     } finally {
@@ -61,6 +65,7 @@ const SignatureModal = ({
 
   const handleClose = () => {
     setSignature('');
+    setNotes('');
     onClose();
   };
 
@@ -79,7 +84,7 @@ const SignatureModal = ({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
+        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
           {taskHazard && (
             <View style={styles.taskInfo}>
               <Text style={styles.taskTitle}>{taskHazard.scopeOfWork || taskHazard.taskName}</Text>
@@ -94,6 +99,24 @@ const SignatureModal = ({
               </Text>
             </View>
           )}
+
+          <View style={styles.notesSection}>
+            <Text style={styles.notesLabel}>Notes (Optional)</Text>
+            <Text style={styles.notesHint}>
+              Add any comments or notes about this approval or rejection
+            </Text>
+            
+            <TextInput
+              style={styles.notesInput}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Enter notes or comments..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
 
           <View style={styles.signatureSection}>
             <Text style={styles.signatureLabel}>Digital Signature *</Text>
@@ -133,7 +156,7 @@ const SignatureModal = ({
               <Text style={styles.buttonText}>Approve</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -164,15 +187,49 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 40,
   },
   taskInfo: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  notesSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  notesLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  notesHint: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#f9fafb',
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
   taskTitle: {
     fontSize: 18,
@@ -189,7 +246,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
@@ -220,7 +277,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 'auto',
+    marginTop: 8,
   },
   button: {
     flex: 1,
