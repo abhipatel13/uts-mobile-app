@@ -11,8 +11,8 @@ export const getAuthToken = async () => {
 };
 
 // API client configuration
-// const API_BASE_URL = 'https://18.188.112.65.nip.io';
-const API_BASE_URL = 'http://10.0.2.2:3000';
+const API_BASE_URL = 'https://18.188.112.65.nip.io';
+// const API_BASE_URL = 'http://10.0.2.2:3000';
 
 // API error class
 export class ApiError extends Error {
