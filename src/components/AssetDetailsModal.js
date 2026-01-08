@@ -67,6 +67,35 @@ const AssetDetailsModal = ({
     }
   };
 
+  // Helper function to render info item only if value exists
+  const renderInfoItem = (icon, label, value) => {
+    if (!value || value === 'N/A' || value === '') return null;
+    return (
+      <View style={styles.infoItem}>
+        <Ionicons name={icon} size={20} color="#64748b" />
+        <View style={styles.infoContent}>
+          <Text style={styles.infoLabel}>{label}</Text>
+          <Text style={styles.infoValue}>{value}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  // Helper function to render multiple info items with proper keys
+  const renderInfoItems = (items) => {
+    return items
+      .filter(item => item && item.value && item.value !== 'N/A' && item.value !== '')
+      .map((item, index) => (
+        <View key={`${item.label}-${index}`} style={styles.infoItem}>
+          <Ionicons name={item.icon} size={20} color="#64748b" />
+          <View style={styles.infoContent}>
+            <Text style={styles.infoLabel}>{item.label}</Text>
+            <Text style={styles.infoValue}>{item.value}</Text>
+          </View>
+        </View>
+      ));
+  };
+
   const renderDetailsTab = () => (
     <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
       {/* Header Card */}
@@ -92,93 +121,64 @@ const AssetDetailsModal = ({
         </View>
       </View>
 
-      {/* Basic Information */}
+      {/* Asset Details */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Basic Information</Text>
+        <Text style={styles.sectionTitle}>Asset Details</Text>
         <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Ionicons name="cube-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Asset Name</Text>
-              <Text style={styles.infoValue}>{asset.name || 'N/A'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Ionicons name="finger-print-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Asset ID</Text>
-              <Text style={styles.infoValue}>{asset.externalId || asset.id || 'N/A'}</Text>
-            </View>
-          </View>
-
-          {asset.cmmsInternalId && (
-            <View style={styles.infoItem}>
-              <Ionicons name="barcode-outline" size={20} color="#64748b" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>CMMS Internal ID</Text>
-                <Text style={styles.infoValue}>{asset.cmmsInternalId}</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.infoItem}>
-            <Ionicons name="layers-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Object Type</Text>
-              <Text style={styles.infoValue}>{asset.objectType || 'N/A'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>System Status</Text>
-              <Text style={styles.infoValue}>{asset.systemStatus || 'N/A'}</Text>
-            </View>
-          </View>
+          {renderInfoItems([
+            { icon: "finger-print-outline", label: "Asset ID", value: asset.externalId || asset.id },
+            { icon: "cube-outline", label: "Name", value: asset.name },
+            { icon: "document-text-outline", label: "Description", value: asset.description },
+            { icon: "layers-outline", label: "Object Type", value: asset.objectType },
+            { icon: "checkmark-circle-outline", label: "System Status", value: asset.systemStatus },
+            { icon: "git-branch-outline", label: "Level", value: asset.level !== undefined && asset.level !== null ? asset.level.toString() : null }
+          ])}
         </View>
       </View>
 
-      {/* Description */}
-      {asset.description && (
+      {/* CMMS Information */}
+      {(asset.cmmsInternalId || asset.cmmsSystem || asset.maintenancePlant) && (
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.descriptionText}>{asset.description}</Text>
+          <Text style={styles.sectionTitle}>CMMS Information</Text>
+          <View style={styles.infoGrid}>
+            {renderInfoItems([
+              { icon: "barcode-outline", label: "CMMS Internal ID", value: asset.cmmsInternalId },
+              { icon: "server-outline", label: "CMMS System", value: asset.cmmsSystem },
+              { icon: "business-outline", label: "Maintenance Plant", value: asset.maintenancePlant }
+            ])}
+          </View>
         </View>
       )}
 
-      {/* Hierarchy Information */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Hierarchy Information</Text>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Ionicons name="git-branch-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Parent Asset</Text>
-              <Text style={styles.infoValue}>
-                {asset.parentExternalId || (asset.parent ? 'Has Parent' : 'Root Asset')}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Ionicons name="business-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Company</Text>
-              <Text style={styles.infoValue}>{asset.companyName || 'N/A'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Ionicons name="location-outline" size={20} color="#64748b" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{asset.location || 'N/A'}</Text>
-            </View>
+      {/* Location Information */}
+      {(asset.functionalLocation || asset.functionalLocationDesc) && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Location Information</Text>
+          <View style={styles.infoGrid}>
+            {renderInfoItems([
+              { icon: "location-outline", label: "Functional Location", value: asset.functionalLocation },
+              { icon: "location-outline", label: "Functional Location Description", value: asset.functionalLocationDesc }
+            ])}
           </View>
         </View>
-      </View>
+      )}
+
+
+
+      {/* Asset Specifications */}
+      {(asset.make || asset.manufacturer || asset.serialNumber) && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Asset Specifications</Text>
+          <View style={styles.infoGrid}>
+            {renderInfoItems([
+              { icon: "construct-outline", label: "Make", value: asset.make },
+              { icon: "factory-outline", label: "Manufacturer", value: asset.manufacturer },
+              { icon: "barcode-outline", label: "Serial Number", value: asset.serialNumber }
+            ])}
+          </View>
+        </View>
+      )}
+
 
       {/* Timestamps */}
       <View style={styles.sectionCard}>

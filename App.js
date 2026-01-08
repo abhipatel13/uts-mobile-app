@@ -187,10 +187,10 @@ function MainAppNavigator({ currentUserRole }) {
           headerRight: ({ navigation }) => (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <NotificationBell navigation={navigation} />
-              <HeaderGPSButton 
-                locationStatus={locationStatus}
-                onPress={() => console.log('GPS pressed')} 
-              />
+            <HeaderGPSButton 
+              locationStatus={locationStatus}
+              onPress={() => console.log('GPS pressed')} 
+            />
             </View>
           ),
         })}

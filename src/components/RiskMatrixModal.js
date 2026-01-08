@@ -214,53 +214,53 @@ const RiskMatrixModal = ({
             style={styles.matrixScrollContainer}
             contentContainerStyle={styles.matrixScrollContent}
           >
-            <View style={styles.matrixContainer}>
-              {/* Headers */}
-              <View style={styles.matrixHeader}>
-                <View style={styles.probabilityHeader}>
+          <View style={styles.matrixContainer}>
+            {/* Headers */}
+            <View style={styles.matrixHeader}>
+              <View style={styles.probabilityHeader}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.headerTextScroll}>
-                    <Text style={styles.headerText}>Probability</Text>
+                <Text style={styles.headerText}>Probability</Text>
                   </ScrollView>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.headerSubtextScroll}>
-                    <Text style={styles.headerSubtext}>Severity →</Text>
+                <Text style={styles.headerSubtext}>Severity →</Text>
                   </ScrollView>
-                </View>
-                
-                {/* Consequence Headers */}
-                {consequenceLabels.map((consequence, index) => (
-                  <View key={consequence.value} style={styles.consequenceHeader}>
+              </View>
+              
+              {/* Consequence Headers */}
+              {consequenceLabels.map((consequence, index) => (
+                <View key={consequence.value} style={styles.consequenceHeader}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.consequenceHeaderTextScroll}>
-                      <Text style={styles.consequenceHeaderText}>{consequence.label}</Text>
+                  <Text style={styles.consequenceHeaderText}>{consequence.label}</Text>
                     </ScrollView>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.consequenceHeaderSubtextScroll}>
-                      <Text style={styles.consequenceHeaderSubtext}>{consequence.description}</Text>
+                  <Text style={styles.consequenceHeaderSubtext}>{consequence.description}</Text>
                     </ScrollView>
-                    <Text style={styles.consequenceScore}>{consequence.score}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Matrix Rows */}
-              {likelihoodLabels.map((likelihood, likelihoodIndex) => (
-                <View key={likelihood.value} style={styles.matrixRow}>
-                  {/* Likelihood Header */}
-                  <View style={styles.likelihoodHeader}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.likelihoodHeaderTextScroll}>
-                      <Text style={styles.likelihoodHeaderText}>{likelihood.label}</Text>
-                    </ScrollView>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.likelihoodHeaderSubtextScroll}>
-                      <Text style={styles.likelihoodHeaderSubtext}>{likelihood.description}</Text>
-                    </ScrollView>
-                    <Text style={styles.likelihoodScore}>{likelihood.score}</Text>
-                  </View>
-                  
-                  {/* Matrix Cells */}
-                  {consequenceLabels.map((_, consequenceIndex) => 
-                    renderMatrixCell(likelihoodIndex, consequenceIndex)
-                  )}
+                  <Text style={styles.consequenceScore}>{consequence.score}</Text>
                 </View>
               ))}
             </View>
+
+            {/* Matrix Rows */}
+            {likelihoodLabels.map((likelihood, likelihoodIndex) => (
+              <View key={likelihood.value} style={styles.matrixRow}>
+                {/* Likelihood Header */}
+                <View style={styles.likelihoodHeader}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.likelihoodHeaderTextScroll}>
+                  <Text style={styles.likelihoodHeaderText}>{likelihood.label}</Text>
+                    </ScrollView>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.likelihoodHeaderSubtextScroll}>
+                  <Text style={styles.likelihoodHeaderSubtext}>{likelihood.description}</Text>
+                    </ScrollView>
+                  <Text style={styles.likelihoodScore}>{likelihood.score}</Text>
+                </View>
+                
+                {/* Matrix Cells */}
+                {consequenceLabels.map((_, consequenceIndex) => 
+                  renderMatrixCell(likelihoodIndex, consequenceIndex)
+                )}
+              </View>
+            ))}
+          </View>
           </ScrollView>
 
           {/* Risk Legend */}

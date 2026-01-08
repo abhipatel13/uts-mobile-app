@@ -632,9 +632,9 @@ const ApprovalRequestsScreen = () => {
             <Text style={styles.commentsLabel}>Notes & Comments:</Text>
             <Text style={styles.commentsText}>{latestApproval.comments}</Text>
             {latestApproval.processedAt && (
-              <Text style={styles.processedDate}>
-                Processed: {formatDate(latestApproval.processedAt)}
-              </Text>
+            <Text style={styles.processedDate}>
+              Processed: {formatDate(latestApproval.processedAt)}
+            </Text>
             )}
           </View>
         )}

@@ -289,6 +289,23 @@ class DatabaseService {
         }
       }
 
+      // Check and add task_hazard_id column to approvals (if missing)
+      const hasTaskHazardIdColumn = await this.columnExists('approvals', 'task_hazard_id');
+      if (!hasTaskHazardIdColumn) {
+        try {
+          // Add column without NOT NULL constraint first
+          await this.executeQuery('ALTER TABLE approvals ADD COLUMN task_hazard_id TEXT');
+          // Update existing records to use id as task_hazard_id
+          await this.executeQuery('UPDATE approvals SET task_hazard_id = id WHERE task_hazard_id IS NULL OR task_hazard_id = ""');
+        } catch (error) {
+          if (error.message.includes('duplicate column name')) {
+            // Column already exists, skip
+          } else {
+            throw error;
+          }
+        }
+      }
+
       // console.log('Database migrations completed successfully');
     } catch (error) {
       console.error('Error running migrations:', error);

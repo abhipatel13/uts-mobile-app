@@ -25,7 +25,6 @@ const TaskHazardScreen = () => {
   const [assets, setAssets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreatingTaskHazard, setIsCreatingTaskHazard] = useState(false);
   const [selectedTaskHazard, setSelectedTaskHazard] = useState(null);
@@ -62,7 +61,6 @@ const TaskHazardScreen = () => {
       } else {
         setIsLoading(true);
       }
-      setError(null);
 
       // Use hybrid service that handles online/offline
       const response = await TaskHazardService.getAll();
@@ -83,7 +81,6 @@ const TaskHazardScreen = () => {
       setDataSource(response.source); // 'api' or 'cache'
     } catch (error) {
       console.error('Error fetching task hazards:', error);
-      setError(error.message || 'Failed to load task hazards.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -391,13 +388,8 @@ const TaskHazardScreen = () => {
       <Ionicons name="warning-outline" size={64} color="#94a3b8" />
       <Text style={styles.emptyStateTitle}>No Task Hazards Found</Text>
       <Text style={styles.emptyStateText}>
-        {error ? 'Unable to load task hazards. Please try again.' : 'No task hazards have been created yet.'}
+        No task hazards have been created yet.
       </Text>
-      {error && (
-        <TouchableOpacity style={styles.retryButton} onPress={() => fetchTaskHazards()}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 

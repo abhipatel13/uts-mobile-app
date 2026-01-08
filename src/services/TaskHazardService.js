@@ -479,15 +479,54 @@ export const TaskHazardService = {
         await TaskHazardApi.delete(id);
         // Remove from cache
         await DatabaseService.delete('task_hazards', id);
+        // Also delete related approvals (if column exists)
+        try {
+          const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+          if (hasColumn) {
+            await DatabaseService.executeQuery(
+              'DELETE FROM approvals WHERE task_hazard_id = ?',
+              [id]
+            );
+          }
+        } catch (error) {
+          // Silently fail if column doesn't exist or query fails
+          console.warn('Could not delete related approvals:', error.message);
+        }
+        // Remove from sync queue
+        await DatabaseService.executeQuery(
+          'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+          ['task_hazard', id]
+        );
+        await DatabaseService.executeQuery(
+          'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+          ['approval', id]
+        );
         return { success: true };
       } else {
         // If it's a temp ID (created offline but not yet synced), just delete it locally
         if (id && typeof id === 'string' && id.startsWith('temp_')) {
           await DatabaseService.delete('task_hazards', id);
+          // Also delete related approvals (if column exists)
+          try {
+            const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+            if (hasColumn) {
+              await DatabaseService.executeQuery(
+                'DELETE FROM approvals WHERE task_hazard_id = ?',
+                [id]
+              );
+            }
+          } catch (error) {
+            // Silently fail if column doesn't exist or query fails
+            console.warn('Could not delete related approvals:', error.message);
+          }
           // Also remove from sync queue if it was there
           await DatabaseService.executeQuery(
             'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
             ['task_hazard', id]
+          );
+          await DatabaseService.executeQuery(
+            'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+            ['approval', id]
           );
           return { success: true, source: 'offline' };
         }
@@ -498,6 +537,20 @@ export const TaskHazardService = {
           status: 'deleted',
           updated_at: Math.floor(Date.now() / 1000)
         });
+        
+        // Also delete related approvals locally (if column exists)
+        try {
+          const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+          if (hasColumn) {
+            await DatabaseService.executeQuery(
+              'DELETE FROM approvals WHERE task_hazard_id = ?',
+              [id]
+            );
+          }
+        } catch (error) {
+          // Silently fail if column doesn't exist or query fails
+          console.warn('Could not delete related approvals:', error.message);
+        }
         
         // Add to sync queue
         await DatabaseService.insert('sync_queue', {
@@ -533,15 +586,54 @@ export const TaskHazardService = {
         await TaskHazardApi.deleteUniversal(id);
         // Remove from cache
         await DatabaseService.delete('task_hazards', id);
+        // Also delete related approvals (if column exists)
+        try {
+          const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+          if (hasColumn) {
+            await DatabaseService.executeQuery(
+              'DELETE FROM approvals WHERE task_hazard_id = ?',
+              [id]
+            );
+          }
+        } catch (error) {
+          // Silently fail if column doesn't exist or query fails
+          console.warn('Could not delete related approvals:', error.message);
+        }
+        // Remove from sync queue
+        await DatabaseService.executeQuery(
+          'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+          ['task_hazard', id]
+        );
+        await DatabaseService.executeQuery(
+          'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+          ['approval', id]
+        );
         return { success: true };
       } else {
         // If it's a temp ID (created offline but not yet synced), just delete it locally
         if (id && typeof id === 'string' && id.startsWith('temp_')) {
           await DatabaseService.delete('task_hazards', id);
+          // Also delete related approvals (if column exists)
+          try {
+            const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+            if (hasColumn) {
+              await DatabaseService.executeQuery(
+                'DELETE FROM approvals WHERE task_hazard_id = ?',
+                [id]
+              );
+            }
+          } catch (error) {
+            // Silently fail if column doesn't exist or query fails
+            console.warn('Could not delete related approvals:', error.message);
+          }
           // Also remove from sync queue if it was there
           await DatabaseService.executeQuery(
             'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
             ['task_hazard', id]
+          );
+          await DatabaseService.executeQuery(
+            'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+            ['approval', id]
           );
           return { success: true, source: 'offline' };
         }
@@ -552,6 +644,20 @@ export const TaskHazardService = {
           status: 'deleted',
           updated_at: Math.floor(Date.now() / 1000)
         });
+        
+        // Also delete related approvals locally (if column exists)
+        try {
+          const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+          if (hasColumn) {
+            await DatabaseService.executeQuery(
+              'DELETE FROM approvals WHERE task_hazard_id = ?',
+              [id]
+            );
+          }
+        } catch (error) {
+          // Silently fail if column doesn't exist or query fails
+          console.warn('Could not delete related approvals:', error.message);
+        }
         
         // Add to sync queue for universal delete
         await DatabaseService.insert('sync_queue', {
@@ -678,10 +784,28 @@ export const TaskHazardService = {
                 // Remove from local database
                 await DatabaseService.delete('task_hazards', localTaskHazard.id);
                 
+                // Also delete related approvals (if column exists)
+                try {
+                  const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+                  if (hasColumn) {
+                    await DatabaseService.executeQuery(
+                      'DELETE FROM approvals WHERE task_hazard_id = ?',
+                      [localTaskHazard.id]
+                    );
+                  }
+                } catch (error) {
+                  // Silently fail if column doesn't exist or query fails
+                  console.warn('Could not delete related approvals:', error.message);
+                }
+                
                 // Remove from sync queue
                 await DatabaseService.executeQuery(
                   'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
                   ['task_hazard', localTaskHazard.id]
+                );
+                await DatabaseService.executeQuery(
+                  'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+                  ['approval', localTaskHazard.id]
                 );
                 
                 syncedCount++;
@@ -714,10 +838,28 @@ export const TaskHazardService = {
               // Remove from local database
               await DatabaseService.delete('task_hazards', localTaskHazard.id);
               
+              // Also delete related approvals (if column exists)
+              try {
+                const hasColumn = await DatabaseService.columnExists('approvals', 'task_hazard_id');
+                if (hasColumn) {
+                  await DatabaseService.executeQuery(
+                    'DELETE FROM approvals WHERE task_hazard_id = ?',
+                    [localTaskHazard.id]
+                  );
+                }
+              } catch (error) {
+                // Silently fail if column doesn't exist or query fails
+                console.warn('Could not delete related approvals:', error.message);
+              }
+              
               // Remove from sync queue
               await DatabaseService.executeQuery(
                 'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
                 ['task_hazard', localTaskHazard.id]
+              );
+              await DatabaseService.executeQuery(
+                'DELETE FROM sync_queue WHERE entity_type = ? AND entity_id = ?',
+                ['approval', localTaskHazard.id]
               );
               
               syncedCount++;
